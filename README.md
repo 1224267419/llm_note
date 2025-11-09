@@ -2,7 +2,7 @@
 
 一个关于[大模型基础和实践学习笔记](https://kcnd4kn8i6ap.feishu.cn/wiki/NeAQwqst2iWgXyk6C1QcaEAUnEc)的笔记,各单元如下
 
-1. [Architecture大模型整体架构](./1_Architecture大模型整体架构)
+1. [Architecture大模型整体架构](1_LLM_Architecture)
 2. Pre-training预训练
 3. Post-training后训练
 4. Common Models常见模型

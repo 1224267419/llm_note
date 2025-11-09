@@ -34,7 +34,34 @@ def get_state(vocab):
             pairs[word[i],word[i+1]]+=freq
     return  pairs
 
-def merge_pair(pairs,text):
-    # 把pair拆开，然后用空格合并起来，然后用\把空格转义
-    sorted_by_value_asc = sorted(pairs.items(), key=lambda item: item[1],reverse=True)
-    new_pair=sorted_by_value_asc[0]
+def merge_pair(pair,v_in):
+    """
+        word = 'T h e <\w>'
+        pair = ('e', '<\w>')
+        word_after_merge = 'T h e<\w>'
+    输入:
+        pair: Tuple[str, str] # 需要合并的字符对
+        v_in: Dict[str, int]  # 合并前的vocab
+    输出:
+        v_out: Dict[str, int] # 合并后的vocab
+    注意:
+        当合并word 'Th e<\w>'中的字符对 ('h', 'e')时，'Th'和'e<\w>'字符对不能被合并。
+    """
+
+
+    v_out={}
+
+    # 将pair中的两个字符用空格连接，
+    # 然后使用re.escape进行转义处理
+    # 这样做是为了确保字符中的特殊符号不会被正则表达式引擎误解释
+    bigram=re.escape(' '.join(pair))
+
+    # 创建一个匹配特定二元组的正则表达式模式, 只有前面、后面不是非空白字符
+    # 才匹配h,e，这样就可以把Th, e<\w>排除在外
+    p = re.compile(r'(?<!\S)' + bigram + r'(?!\S)')
+    for i in v_in:
+        # 遍历当前的vocabulary，找到匹配正则的v时，才用合并的pair去替换变成新的pair new，如果没有匹配上，那就保持原来的。
+        new=p.sub(" ".join(pair),i)
+        # 统计替换后的单词出现的次数
+        v_out[new]=v_in[i]
+    return v_out
