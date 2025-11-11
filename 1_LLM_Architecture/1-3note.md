@@ -71,7 +71,7 @@ $$\text{score}=\frac{P(t_z)}{P(t_x)P(t_y)}$$其中z是token x ,y合并后token�
 
 和上述思想不同,词表**从大到小**。
 
-![image-20251109224242253](./note.assets/image-20251109224242253.png)
+![image-20251109224242253](./1-3note.assets/image-20251109224242253.png)
 
 **核心思想：**&#x521D;始化一个大词表，然后通过 unigram 语言模型计算**删除**不同**subword的损失**来代表subword的重要性(负对数似然)，**保留loss较大或者说重要性较高的subword**，&#x55;LM会倾向于保留那些以**较高频率出现在很多句子的分词结果中的子词**，因为这些子词如果被删除，其损失会很大 
 
@@ -134,7 +134,7 @@ todo:四种tokenizer的codeing
 
 ## 2_2 Word2Vec
 
-![image](note.assets/image.png)
+![image](1-3note.assets/image.png)
 
 **Distributed representation**通过训练，将原来One-Hot编码的每个词都映射到一个**较短的词向量**上来，而这个较短的词向量的维度可以由自己在训练时根据任务需要来指定
 
@@ -144,7 +144,7 @@ todo:四种tokenizer的codeing
 
 根据上下文语境预测当前词,具体结构如图所示
 
-![image-4](note.assets/image-4.png)
+![image-4](1-3note.assets/image-4.png)
 
 ###  [Skip-gram.py](code\2_Skip-gram.py) 
 
@@ -152,7 +152,7 @@ todo:四种tokenizer的codeing
 
 for example:对于同义词“intelligent”和“smart”，我们觉得这两个单词应该拥有相同的“上下文”。而如”engine“和”transmission“这样相关的词语，可能也拥有着相似的上下文。
 
-![image-1](note.assets/image-1.png)
+![image-1](1-3note.assets/image-1.png)
 
 
 
@@ -206,7 +206,7 @@ for example:对于同义词“intelligent”和“smart”，我们觉得这两�
 
 ### FastText
 
-![image-3](note.assets/image-3.png)
+![image-3](1-3note.assets/image-3.png)
 
 fastText模型也只有三层：输入层、隐含层、输出层，
 
@@ -222,7 +222,7 @@ fastText模型也只有三层：输入层、隐含层、输出层，
 
 2. **Hierarchical Softmax：**根据**类别的频率构造霍夫曼树**来代替标准softmax，通过分层softmax可以将复杂度从N降低到logN，下图给出分层softmax示例：
 
-   ![](note.assets/image-2.png)
+   ![](1-3note.assets/image-2.png)
 
    具体来说，这棵哈夫曼树除了根结点以外的所有非叶节点中都含有一个由参数`θ`确定的sigmoid函数，不同节点中的`θ`不一样。训练时隐藏层的向量与这个sigmoid函数进行运算，根据结果进行分类，若分类为负类则沿左子树向下传递，编码为0；若分类为正类则沿右子树向下传递，编码为1。
 
@@ -248,13 +248,13 @@ AI总结 :讨论了注意力机制在自然语言处理中的应用，包括其�
 
 ## Attention核心思想
 
-![self-attention](note.assets/image-13.png)
+![self-attention](1-3note.assets/image-13.png)
 
-![image-14](note.assets/image-14.png)**网络应关注输入重要部分**，通过学习权重显式加权重要部分，Scaled Dot-Product Attention用于计算，Attention除以特定值$\sqrt{d_k}$使得计算前后的矩阵服从(0,1)分布),数值存在于softmax梯度较大的范围,易于模型收敛到更优值
+![image-14](1-3note.assets/image-14.png)**网络应关注输入重要部分**，通过学习权重显式加权重要部分，Scaled Dot-Product Attention用于计算，Attention除以特定值$\sqrt{d_k}$使得计算前后的矩阵服从(0,1)分布),数值存在于softmax梯度较大的范围,易于模型收敛到更优值
 
 ## Transformer中的Attention
 
-![attention](note.assets/image-1-1762745855112.png)![transformer](note.assets/image-1762745844954.png)
+![attention](1-3note.assets/image-1-1762745855112.png)![transformer](1-3note.assets/image-1762745844954.png)
 
 1. Self-Attention捕捉输入序列内部依赖关系，
 
@@ -286,7 +286,7 @@ AI总结 :讨论了注意力机制在自然语言处理中的应用，包括其�
 Self Attention的时间复杂度是$$O(N^2)
 $$的，它要对序列中的**任意两个向量都要计算相关度**，得到一个$$N^2$$大小的相关度矩阵，图示如下：
 
-![attention](note.assets/image-2-1762746646246.png)
+![attention](1-3note.assets/image-2-1762746646246.png)
 
 ### **Sparse Attention**
 
@@ -299,7 +299,7 @@ Sparse Attention具有“局部紧密相关和远程稀疏相关”特性，但�
 > 1. 如何选择要保留的注意力区域，这是人工主观决定的，带有很大的不智能性
 > 2. 它需要从编程上进行特定的设计优化，才能得到一个高效的实现，所以它不容易推广
 
-![](note.assets/image-3-1762746743504.png)
+![](1-3note.assets/image-3-1762746743504.png)
 
 完整的Sparse Attention实现可以参考 https://github.com/openai/sparse_attention/blob/master/attention.py
 
@@ -311,7 +311,7 @@ Sparse Attention具有“局部紧密相关和远程稀疏相关”特性，但�
 
 ### [Linear Attention](https://arxiv.org/abs/2006.16236)
 
-![img](note.assets/v2-ca4954b4c0f4b72fb2ced11b82e527ff_r.jpg)
+![img](1-3note.assets/v2-ca4954b4c0f4b72fb2ced11b82e527ff_r.jpg)
 
 图1中提到了多项式注意力多项式注意力和[RBF核注意力](https://zhida.zhihu.com/search?content_id=256552727&content_type=Article&match_order=1&q=RBF核注意力&zhida_source=entity)，这里也介绍下：
 1）多项式注意力：是一种通过对输入向量进行多项式变换来计算注意力权重的方法。这种机制一般会将输入向量经过一个多项式函数（如二次函数*f*(*x*)=*ax^*2+*bx*+*c*或三次函数）来增强或抑制特定的特征，优点在于它能够捕捉输入数据中更复杂的非线性关系。注意：多项式函数的参数a/b/c会在训练中不断更新。
@@ -339,7 +339,7 @@ $$Attention(\boldsymbol{Q},\boldsymbol{K},\boldsymbol{V})=softmax_{2}\left(\bold
 
 如果直接取 $$\phi(\boldsymbol{q}_i)=softmax(\boldsymbol{q}_i),\varphi(\boldsymbol{k}_j)=softmax(\boldsymbol{k}_j)$$。另外这个设计在CV中出现过不止一次，比如[A2-Nets](https://papers.nips.cc/paper/7318-a2-nets-double-attention-networks.pdf)也包含了同样的做法
 
-![](note.assets/image-4-1762747112126.png)
+![](1-3note.assets/image-4-1762747112126.png)
 
 完整代码在：https://github.com/lucidrains/linear-attention-transformer
 
@@ -374,7 +374,7 @@ def linear_attn(q, k, v, kv_mask = None):
 
 
 
-## KV Cache键值缓存
+## KV Cache
 
 > **一句话总结**：`kv cache`只出现在`transformer`结构的自回归的`decoder`中，为了避免`scaled dot-product attention`过程中的重复计算，将之前序列token计算过的KV缓存下来用。
 
@@ -392,7 +392,7 @@ $$Att_2(Q,K,V) = softmax(Q_2, K_1^T,)V_1+softmax(Q_2, K_2^T)V_2$$
 
 所以第二步可简化为下图，后面的token以此类推
 
-![](note.assets/diagram-2.png)
+![](1-3note.assets/diagram-2.png)
 
 - **Hugging face的KV Cache实现**
 
@@ -417,7 +417,7 @@ else:
 > 3. - - 对每个chunk的KV，Q和他们进行之前一样的FlashAttention获取这个chunk的结果
 >      - 对每个chunk的结果进行reduce
 
-![](note.assets/image-6.png)
+![](1-3note.assets/image-6.png)
 
 **窗口优化示意图**
 
@@ -446,27 +446,186 @@ PPL:困惑度,	低 → 模型对预测下一个词“很有把握”
 - **复杂度**：*O*($TL^2$)（每次新 token 输入都要重算缓存，计算量陡增，效率差）。
 - 精度高,效率低
 
-#### (d) StreamingLLM 
+#### (d) [StreamingLLM ](https://github.com/mit-han-lab/streaming-llm)
 
 - **机制**：引入**Attention Sink（注意力汇点，黄色 token）**，保留关键的历史 token 作为 “锚点”，同时缓存`L`个近期 token；超出的 token 被 “丢弃（evicted）”。
 - **复杂度**：*O*($TL$)（效率与窗口注意力相当）。
 - 精度高效率高
 
+### **KV Cache 优化方法**
+
+> 1. **共用 KV cache：MQA，GQA 见1.3.5章 [ 1.3 Attention 注意力](https://kcnd4kn8i6ap.feishu.cn/wiki/SUHDwvtwLiyigUkbMk5c49sPnHW#share-RkpNd6VnmoeP3MxuYdvcKuZWnGb)**
+> 2. **窗口优化：**
+>
+> KV cache 的作用是计算 attention，当推理时的文本长度 T 大于训练时的最大长度 L 时，一个自然的想法就是**滑动窗口**。这里又有三种方式：
+>
+> - **固定窗口长度**（图 b），典型代表即 Longformer，该方法实现简单，而空间复杂度只有 O(TL) ，但是精度下降比较大
+> - **KV 重计算**（图 c），该方法需要每次计算都重新计算长度为L的 KV cache，由于重计算的存在，其精度可以保证，但是性能损失比较大
+> - **箭型 attention 窗口**，在 [LM-Infinit](https://arxiv.org/pdf/2308.16137.pdf) 中就已经被提出了，其基本原理和 [StreamingLLM](https://arxiv.org/pdf/2309.17453.pdf) 是一致的
+>
+> 3. **量化与稀疏：**&#x5F53;前主流推理框架都在逐步支持 KV Cache 量化，一个典型的案例是 [lmdeploy](https://github.com/InternLM/lmdeploy)
+> 4. **存储与计算优化：**
+>    - [vLLM](https://github.com/vllm-project/vllm) 的 PagedAttention，简单来说就是允许在非连续的内存空间中存储连续的 K 和 V
+>    - **FlashDecoding** 是在 FlashAttention 的基础上针对 inference 的优化主要分为三步：
+>      - 长文本下将KV分成更小且方便并行的chunk
+>      - 对每个chunk的KV，Q和他们进行之前一样的FlashAttention获取这个chunk的结果
+>      - 对每个chunk的结果进行reduce
 
 
 
+## [**缓存与效果的取舍**：MHA到MLA](https://zhuanlan.zhihu.com/p/21151178690)
 
-## **缓存与效果的取舍**：
+![](1-3note.assets/image-11.png)
 
-MHA每个头关注不同子空间特征；MQA所有query head共享KV，影响学习效率和效果；GQA分组共享KV，平衡效果和缓存；MLA优化MQA，减少KV Cache但推理计算量增加。
+### **Multi-head Attention**
 
-## **DCA (Dual Chunk Attention)**：
+原始transformer中的attention也是MHA，每一个`head`的`head_size`将变为原始`embed_size`的`1/num_head`，类似group卷积，类似于**建立了很多个交流通道，每个交流通道关注的信息细节不一样，也就是每一个头可以关注到序列中不同子空间的特征**
+
+在**推理**过程中，随着输入文本的不断增多，每次都要计算历史的QKV矩阵，为了更好的用户体验（加速），就把历史的KV矩阵存储下来，减少了重复运算，称之为**KV cache**。
+
+但速度快了，KV cache越存越大也不是个事啊，所以，我们就有以下策略：
+
+### MQA
+
+既然KV cache那么珍贵，那就少用一点，来个共享版：**M**ulti-**Q**uery**A**ttention
+
+![img](1-3note.assets/v2-d6f96cc5906aa02dd6117e911627eafe_1440w.jpg)
+
+如图,各个q_head共享通一个k和v,**kv cache的大小降低至1/head_num**
+
+**缺点:性能上的下降不可避免，也会影响模型的稳定性**
+
+### 折中 GQA
+
+既然每个Q用一个KV太多，一起用一个又不够，不如来个折中，一组用一个：**G**rouped-**Q**uery**A**ttention
+
+![img](1-3note.assets/v2-61211c13e1fe71d2eb4a24da6506f123_1440w.jpg)
+
+配置参数 `g` 对 Query 进行分组：
+
+- 当 `g = 1` 时，即为 **MQA（多查询注意力）**；
+- 当 `g = n`（`n` 为头数）时，即为 **MHA（多头注意力）**。
+
+目前常用的模型：[LLAMA2-70B](https://link.zhihu.com/?target=https%3A//llama.meta.com/llama2/)、[LLAMA3](https://link.zhihu.com/?target=https%3A//llama.meta.com/llama3/)全系列、[TigerBot](https://link.zhihu.com/?target=https%3A//papers.cool/arxiv/2312.08688)、[DeepSeek-V1](https://link.zhihu.com/?target=https%3A//papers.cool/arxiv/2401.02954)、[StarCoder2](https://link.zhihu.com/?target=https%3A//papers.cool/arxiv/2402.19173)、[Yi](https://link.zhihu.com/?target=https%3A//papers.cool/arxiv/2403.04652)、[ChatGLM2](https://link.zhihu.com/?target=https%3A//github.com/THUDM/ChatGLM2-6B)、[ChatGLM3](https://link.zhihu.com/?target=https%3A//github.com/THUDM/ChatGLM3)用的都是这个方法。
+
+
+
+### 降秩MLA
+
+DeepseekV2**提出的优化MQA方法，**解决的核心问题是使用kv cache时，随着序列长度变长导致显存不足的问题**
+
+- **参考：**https://arxiv.org/pdf/2405.04434，[DeepSeek-V2论文解析](https://blog.csdn.net/bqw18744018044/article/details/138751458) (vip文章,[本地版](1-3note.assets\[自然语言处理][大模型]DeepSeek-V2论文解析.html) )
+- **具体工程实现参考：**[DeepSeek-V2 MLA KV Cache 真的省了吗？](https://zhuanlan.zhihu.com/p/714761319)
+
+**M**ulti-head**L**atent**A**ttention，其本质思想是将原本的权重**降秩**成两个，大家伙先**公用**一个KV权重，就像MQA那样，而**私有**的KV权重，这能藏在哪里呢？**如果能够转移到Q和输出O上，是不是就即节省了内存，又不降低性能**呢？来看具体内容：
+
+#### 低秩Key-Value联合压缩
+
+![MHA-MLA](1-3note.assets/297ae3361bca22681f62f36ec908e3f7.png)
+
+ **MLA通过[低秩联合](####低秩联合)压缩key和value来减少kv cache,公式如下**
+$$
+\begin{align}
+\mathbf{c}_t^{KV} &= W^{DKV} \mathbf{h}_k  \\
+\mathbf{k}_t^C &= W^{UK} \mathbf{c}_t^{KV}  \\
+\mathbf{v}_t^C &= W^{UV} \mathbf{c}_t^{KV} 
+\end{align}
+$$
+低秩联合是一种针对 Transformer 注意力机制中键（Key）和值（Value）的**压缩优化技术**，核心是通过**低秩矩阵分解与联合表示**，将高维的 Key 和 Value 压缩为低维的潜在向量，从而大幅减少推理时的 KV Cache 占用。
+
+其中$\mathbf{c}_t^{KV} \in \mathbb{R}^{d_c}$是用于压缩key和value的隐向量；$d_c (\ll d_k, n_h)$表示KV压缩的维度；$W^{DKV} \in \mathbb{R}^{d_c \times d}$是下投影矩阵，$W^{UK}, W^{UV} \in \mathbb{R}^{d_k n_h \times d_c}$表示上投影矩阵。在推理时，MLA仅需要缓存$\mathbf{c}_t^{KV}$，因此kv cache仅需要缓存$d_c$个元素。此外，在推理时可以把$W^{UK}$吸收到$W^Q$，$W^{UV}$吸收到$W^O$中，这样甚至都**不需要计算key和value**。
+
+同时MLA也对query做了低秩压缩，来减少训练中的激活值显存：
+
+$$c_t^Q = W^{DQ} {h}_t  \\
+q_t^C = {W}^{UQ} {c}_t^Q \\
+c_t^Q \in \mathbb{R}^{d_c'}, W^{DQ}\in\mathbb{R}^{d_c'\times d},W^{UQ}\in\mathbb{R}^{d_nn_h\times d_c'}$$
+
+
+
+#### 低秩联合
+
+$$
+\begin{align}
+\mathbf{c}_t^{KV} &= W^{DKV} \mathbf{h}_k  \\
+\mathbf{k}_t^C &= W^{UK} \mathbf{c}_t^{KV}  \\
+\mathbf{v}_t^C &= W^{UV} \mathbf{c}_t^{KV} 
+\end{align}
+$$
+
+
+
+低秩联合通过以下方式降低缓存成本：
+
+- **只缓存潜在向量**：推理时仅需缓存 $\mathbf{c}_t^{KV}$ ，其维度  $d_c$  极小（如DeepSeek-V2中  $ d_c$  可设为32），因此KV Cache的总容量从  $O(d_k n_h \times \text{seq_len})$ 降至  $O(d_c \times \text{seq_len})$ ，压缩率可达93.3%以上。
+- **矩阵吸收优化**：上投影矩阵 \( W^{UK} \)、\( W^{UV} \) 可在推理时“吸收”到查询（Query）的投影矩阵中，甚至无需显式计算Key和Value，进一步减少计算与存储开销。
+
+
+### 三、优势与效果
+- **显存占用剧减**：以DeepSeek-V2为例，KV Cache减少93.3%，使大模型能处理更长序列或更大批量，同时降低GPU显存压力。
+- **性能损失极小**：通过低秩压缩保留Key和Value的核心信息，模型性能与MHA几乎持平（如LongBench任务性能仅下降0.5%）。
+- **推理效率提升**：缓存量减少后，内存带宽压力降低，推理吞吐量可提升5.76倍以上。
+
+
+简言之，低秩联合通过“压缩-重建”的低秩矩阵技巧，在保持注意力表达能力的前提下，将KV Cache的存储成本从“高维冗余”压缩为“低维核心”，是大模型推理效率优化的关键技术之一。
+
+### **结论**
+
+目前DeepseekV2官方实现在存储KV Cache的时候并不是存储隐向量，而是把隐向量都解压缩变成了标准的MHA的KV Cache，实际上是完全不能节省显存的（只是V2Attention中的实现）
+
+MHA每个头关注不同子空间特征；MQA**所有query head共享KV**，影响学习效率和效果；**GQA分组共享KV，平衡效果和缓存**；**MLA优化MQA，减少KV Cache但推理计算量增加**。
+
+剩余的部分代码和公式去1.3markdown种寻找即可
+
+## [DCA (Dual Chunk Attention)](https://awesomeml.com/llm-dual-chunk-attention/)
+
+Dual Chunk Attention (DCA)是一种推理阶段的优化技术，通过将输入序列智能划分为"当前块"(current chunk)和"历史块"(history chunk)两个逻辑单元，实现长上下文高效处理。 其核心思想是：
+对**近期内容精细处理**，对**历史内容粗粒度压缩**，平衡计算效率与信息保留
+
+与传统方法相比，DCA的关键优势在于：
+
+- **无需重新训练模型**
+- **显存占用仅随上下文长度线性增长**
+- **保留全局上下文信息，避免关键内容丢失**
+
+> 通过这种方式，DCA能够有效地处理长文本，同时保持较高的计算效率和较低的内存占用
+
+![](1-3note.assets/image-17.png)
+
+### 处理流程
+
+1. **序列分块**：将输入序列划分为当前块和历史块
+2. **历史压缩**：将历史块压缩为固定长度的表示
+3. **分块注意力**：计算当前块内部及与压缩历史的注意力
+4. **输出生成**：基于增强的注意力生成下一个token
+
+
+
+> 
+
+### 代码
+
+论文中给出的代码链接：https://github.com/HKUNLP/ChunkLlama/blob/main/chunkqwen_attn_replace.py
+
+总结
 
 将长文本分块，分别进行块内和块间注意力计算，能有效处理长文本，保持计算效率和低内存占用。   
 
-## **S2-Attention (Shifted Sparse Attention)**：
 
-将上下文长度分组，半注意力头中移位token保证相邻信息流动，可通过微调注意力掩码避免信息泄漏。
+
+## **S2-Attention(Shifted Sparse Attention)**
+
+> **论文： *LONGLORA: EFFICIENT FINE-TUNING OF LONG CONTEXT LARGE LANGUAGE MODELS***
+>
+> **链接：**&#x68;ttps://arxiv.org/pdf/2309.12307
+>
+> **源码地址：**&#x68;ttps://github.com/dvlab-research/LongLoRA
+>
+> 将上下文长度分成几个组，并在每个组中单独计算注意力。在半注意力头中，将token按半组大小进行移位，这保证了相邻组之间的信息流动。例如，使用组大小为2048的S2-Attn来近似总共8192个上下文长度训练
+>
+> 1. 首先，它将沿头部维度的特征分成两大块 ( 比如8行4列，8行相当于8个token，4列可以认为是有4个头，然后竖着一切为二 )
+> 2. 其次，其中一个块中的标记被移动组大小的一半，**第2个part的第8个token的后一半表示(也即原始inputs第8个token的后两个heads)移动到第2个part的第1行，而第2个part中原来的「第1-7个token的后一半表示」整体往下移动一行**
+> 3. 最后，将token分组并重塑为批量维度，注意力只在每个组内计算，信息通过移位在不同组之间流动。虽然移位可能会引入潜在的信息泄漏，但这可以通过对注意力掩码进行微调来避免
 
 
 
