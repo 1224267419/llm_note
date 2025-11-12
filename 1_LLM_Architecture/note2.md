@@ -319,3 +319,62 @@ $$std=gain×\sqrt{\frac{2}{fan\_in+fan\_out}}$$
 
 ![](./note2.assets/image-15.png)
 
+# [位置编码](https://www.zhihu.com/tardis/zm/art/675243992)
+
+**transformer**中token位置不影响attention分数(i think therefore i am 两个 i 的注意力分数一致),因此需要引入时序信息,即位置编码
+
+一个好的位置编码的要求:
+
+1. 每个位置输出一个**唯一**的编码
+2. 具备良好的**外推性**
+3. 任何位置之间的**相对距离**在不同长度的句子中应该是**一致**的
+
+位置编码通常有两种:**相对**位置编码和**绝对**位置编码,且又分**可学习**和**不可学习**两种 ,下面给出相关示例
+
+## 绝对位置编码
+
+### **Transformer的位置编码** (Sinusoidal)
+
+> **Transformer的位置编码加在embedding上**，但是由于使用的是**sin cos 交替**，可以通过**线性变换矩阵得到其他位置的表示**，所以可以期望他包含了**相对位置的信息**，而且由于**三角函数有显示的生成规律，所以可以期望有外推性质**
+>
+> * **相对位置计算公式：**
+>   $$
+>   PE_t = [\sin(w_0t), \cos(w_0t), \sin(w_1t), \cos(w_1t), \ldots, \sin(w_{\frac{d_{model}}{2}-1}t), \cos(w_{\frac{d_{model}}{2}-1}t)]
+>   $$
+>
+>   $$
+>   \begin{pmatrix}
+>   \sin(t + \triangle t) \\
+>   \cos((t + \triangle t))
+>   \end{pmatrix} =
+>   \begin{pmatrix}
+>   \cos \triangle t & \sin \triangle t \\
+>   -\sin \triangle t & \cos \triangle t
+>   \end{pmatrix}
+>   \begin{pmatrix}
+>   \sin t \\
+>   \cos t
+>   \end{pmatrix}
+>   $$
+>
+> * **可视化：**&#x4E0B;图是长度为100，编码维度为512的序列的位置编码可视化，可以发现，由于sin/cos函数的性质，位置向量的每一个值都位于\[-1, 1]之间。同时，纵向来看，图的右半边几乎都是黄色的，这是因为**越往后的位置，频率越小，波长越长**，所以不同的t对最终的结果影响不大。而越往左边走，颜色交替的频率越频繁
+
+![](./note2.assets/image-10.png)
+
+> * **Transformer位置编码的缺点：**由于**位置编码点积的无向性**， $$  P E_t^T * P E_{t+\Delta t} = P E_t^T * P E_{t - \Delta t}  $$ 即两个位置编码的乘积仅取决于 $$\Delta T$$，**距离是成对分布的，不能用来表示位置的方向性**。当随着input embedding被喂入attention的时候会出现**距离意识被破坏的现象**，即**正弦位置编码的相对位置表达能力被投影矩阵破坏掉了**，所以在后续BERT的改进中，采用了可学习的位置编码
+
+距离意识被破坏:实际的Attention计算中还需要与attention的权重W相乘，即 $PE_t^T{W}_q^{T}{W}_kPE_{t+k}$,**内积结果不能反映相对距离**
+
+
+
+### **BERT的可学习位置编码**
+
+直接将**位置编码当作可训练参数**，比如最大长度为512，编码维度为768，那么就**初始化一个512×768的矩阵作为位置向量**，让它随着训练过程更新。对于这种训练式的绝对位置编码，一般的认为它的**缺点是没有长度外推性**，即如果预训练最大长度为512的话，那么最多就只能处理长度为512的句子，**再长就处理不了**了。当然，也可以将超过512的位置向量随机初始化，然后继续微调
+
+### **RNN 位置编码**
+
+**递归式的绝对位置编码，**input后面接一层RNN，可以用RNN学每个位置的位置编码。**优点是外推、灵活，缺点是丧失transformed的并行处理性质**
+
+# **1.5.3 [相对位置编码**RPR](https://zhuanlan.zhihu.com/p/397269153)
+
+[wenet](https://zhida.zhihu.com/search?content_id=176412419&content_type=Article&match_order=1&q=wenet&zhida_source=entity)和**vits**使用了**Relative Position Representation**,
