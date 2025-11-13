@@ -321,6 +321,8 @@ $$std=gain×\sqrt{\frac{2}{fan\_in+fan\_out}}$$
 
 # [位置编码](https://www.zhihu.com/tardis/zm/art/675243992)
 
+[参考链接2](https://spaces.ac.cn/archives/8130)
+
 **transformer**中token位置不影响attention分数(i think therefore i am 两个 i 的注意力分数一致),因此需要引入时序信息,即位置编码
 
 一个好的位置编码的要求:
@@ -369,12 +371,189 @@ $$std=gain×\sqrt{\frac{2}{fan\_in+fan\_out}}$$
 
 ### **BERT的可学习位置编码**
 
+有实验表明，在像BERT这样的经过充分预训练的Transformer模型中，**直接训练的位置编码效果是要比Sinusoidal位置编码好些**
 直接将**位置编码当作可训练参数**，比如最大长度为512，编码维度为768，那么就**初始化一个512×768的矩阵作为位置向量**，让它随着训练过程更新。对于这种训练式的绝对位置编码，一般的认为它的**缺点是没有长度外推性**，即如果预训练最大长度为512的话，那么最多就只能处理长度为512的句子，**再长就处理不了**了。当然，也可以将超过512的位置向量随机初始化，然后继续微调
 
 ### **RNN 位置编码**
 
 **递归式的绝对位置编码，**input后面接一层RNN，可以用RNN学每个位置的位置编码。**优点是外推、灵活，缺点是丧失transformed的并行处理性质**
 
-# **1.5.3 [相对位置编码**RPR](https://zhuanlan.zhihu.com/p/397269153)
+# [相对位置编码RPR](https://zhuanlan.zhihu.com/p/397269153)
 
-[wenet](https://zhida.zhihu.com/search?content_id=176412419&content_type=Article&match_order=1&q=wenet&zhida_source=entity)和**vits**使用了**Relative Position Representation**,
+## **Relative Position Representation**
+
+起源于Google的论文[《Self-Attention with Relative Position Representations》](https://papers.cool/arxiv/1803.02155)
+
+**[wenet](https://zhida.zhihu.com/search?content_id=176412419&content_type=Article&match_order=1&q=wenet&zhida_source=entity)和**vits**使用了**Relative Position Representation**,**
+**总结:删除$P_iW_Q$, 且$\boldsymbol{p}_j \boldsymbol{W}_K$改为二元位置向量$\boldsymbol{R}_{i,j}^K$**  $\boldsymbol{p}_j \boldsymbol{W}_v$改为二元位置向量$\boldsymbol{R}_{i,j}^V$
+
+一般认为，相对位置编码是由绝对位置编码启发而来，考虑一般的带绝对位置编码的Attention：
+
+ $$ \begin{cases} \boldsymbol{q}_i = (\boldsymbol{x}_i + \boldsymbol{p}_i) \boldsymbol{W}_Q \\ \boldsymbol{k}_j = (\boldsymbol{x}_j + \boldsymbol{p}_j) \boldsymbol{W}_K \\ \boldsymbol{v}_j = (\boldsymbol{x}_j + \boldsymbol{p}_j) \boldsymbol{W}_V \\ a_{i,j} = \text{softmax}\left( \boldsymbol{q}_i \boldsymbol{k}_j^\top \right) \\ \boldsymbol{o}_i = \sum_j a_{i,j} \boldsymbol{v}_j \end{cases} \tag{2} $$ 
+
+其中$\text{softmax}$对$j$那一维归一化，这里的向量都是指向量。我们初步展开$\boldsymbol{q}_i \boldsymbol{k}_j^\top$： 其中$$ \boldsymbol{q}_i \boldsymbol{k}_j^\top = (\boldsymbol{x}_i + \boldsymbol{p}_i) \boldsymbol{W}_Q \boldsymbol{W}_K^\top (\boldsymbol{x}_j + \boldsymbol{p}_j)^\top = (\boldsymbol{x}_i \boldsymbol{W}_Q + \boldsymbol{p}_i \boldsymbol{W}_Q) \left( \boldsymbol{W}_K^\top \boldsymbol{x}_j^\top + \boldsymbol{W}_K^\top \boldsymbol{p}_j^\top \right) \tag{3} $$ 
+
+为了引入相对位置信息，Google把第一项位置$p_iW_Q$去掉，第二项$\boldsymbol{p}_j \boldsymbol{W}_K$改为二元位置向量$\boldsymbol{R}_{i,j}^K$，变成 $$ a_{i,j} = \text{softmax}\left( \boldsymbol{x}_i \boldsymbol{W}_Q \left( \boldsymbol{x}_j \boldsymbol{W}_K + \boldsymbol{R}_{i,j}^K \right)^\top \right) \tag{4} $$ 以及
+
+$\boldsymbol{o}_i = \sum_j a_{i,j} \boldsymbol{v}_j = \sum_j a_{i,j} \left( \boldsymbol{x}_j \boldsymbol{W}_V + \boldsymbol{p}_j \boldsymbol{W}_V \right)$中的$\boldsymbol{p}_j \boldsymbol{W}_V$换成$\boldsymbol{R}_{i,j}^V$： $$ \boldsymbol{o}_i = \sum_j a_{i,j} \left( \boldsymbol{x}_j \boldsymbol{W}_V + \boldsymbol{R}_{i,j}^V \right) \tag{5} $$ 
+
+所谓**相对位置**，是将**本来依赖于二元坐标$(i,j)$的向量$\boldsymbol{R}_{i,j}^K, \boldsymbol{R}_{i,j}^V$，改为只依赖于相对距离$i-j$**，并且通常来说会进行截断，以适应不同任意的距离
+
+ $$ \begin{cases} \boldsymbol{R}_{i,j}^K = \boldsymbol{p}_K\left[ \text{clip}(i-j, p_{\text{min}}, p_{\text{max}}) \right] \\ \boldsymbol{R}_{i,j}^V = \boldsymbol{p}_V\left[ \text{clip}(i-j, p_{\text{min}}, p_{\text{max}}) \right] \end{cases} \tag{6} $$ 这样一来，只需要**有限个位置编码，就可以表达出任意长度的相对位置**（因为进行了截断），不管$\boldsymbol{p}_K, \boldsymbol{p}_V$是选择可训练式的还是三角函数式的，都可以达到处理任意长度文本的需求。
+
+```python
+def clip(value, min_value, max_value):
+    if value < min_value:
+        return min_value
+    elif value > max_value:
+        return max_value
+    else:
+        return value
+```
+
+## XLNET式位置编码 
+
+XLNET式位置编码其实源自Transformer-XL的论文[《Transformer-XL: Attentive Language Models Beyond a Fixed-Length Context》](https://arxiv.org/pdf/1901.02860)，只不过因为使用了Transformer-XL架构的XLNET模型并在一定程度上超过了BERT后，Transformer-XL才算广为人知，因此这种位置编码通常也被冠以XLNET之名。  XLNET式位置编码源于对上述$\boldsymbol{q}_i\boldsymbol{k}_j^\top$的完全展开： 
+$$
+\boldsymbol{q}_i\boldsymbol{k}_j^\top = \boldsymbol{x}_i \boldsymbol{W}_Q \boldsymbol{W}_K^\top \boldsymbol{x}_j^\top +\\ \boldsymbol{x}_i \boldsymbol{W}_Q \boldsymbol{W}_K^\top \boldsymbol{p}_j^\top + \boldsymbol{p}_i \boldsymbol{W}_Q \boldsymbol{W}_K^\top \boldsymbol{x}_j^\top + \boldsymbol{p}_i \boldsymbol{W}_Q \boldsymbol{W}_K^\top \boldsymbol{p}_j^\top \tag{7}
+$$
+Transformer-XL的做法很简单，直接将$\boldsymbol{p}_j$替换为相对位置向量$\boldsymbol{R}_{i-j}$，至于两个$\boldsymbol{p}_i$，则干脆替换为两个可训练的向量$\boldsymbol{u}, \boldsymbol{v}$：
+$$
+\boldsymbol{x}_i \boldsymbol{W}_Q \boldsymbol{W}_K^\top \boldsymbol{x}_j^\top + \boldsymbol{x}_i \boldsymbol{W}_Q \boldsymbol{W}_K^\top \boldsymbol{R}_{i-j}^\top \\+ \boldsymbol{u} \boldsymbol{W}_Q \boldsymbol{W}_K^\top \boldsymbol{x}_j^\top + \boldsymbol{v} \boldsymbol{W}_Q \boldsymbol{W}_K^\top \boldsymbol{R}_{i-j}^\top \tag{8}
+$$
+
+
+**该编码方式中的$\boldsymbol{R}_{i-j}$没有像式(6)那样进行截断，而是直接用了Sinusoidal式的生成方案(原始Transformer的正余弦方式**)，由于$\boldsymbol{R}_{i-j}$的编码空间与$\boldsymbol{x}_j$不一定相同，所以$\boldsymbol{R}_{i-j}$前面的$\boldsymbol{W}_K^\top$换了另一个独立的矩阵$\boldsymbol{W}_{K,R}^\top$，$\boldsymbol{u}\boldsymbol{W}_Q$、$\boldsymbol{v}\boldsymbol{W}_Q$均为可学习参数,直接合并为单个$\boldsymbol{u}$、$\boldsymbol{v}$，所以最终使用的式子是 
+$$
+\boldsymbol{atten}_{i,j}=\boldsymbol{x}_i \boldsymbol{W}_Q \boldsymbol{W}_K^\top \boldsymbol{x}_j^\top + \boldsymbol{x}_i \boldsymbol{W}_Q \boldsymbol{W}_{K,R}^\top \boldsymbol{R}_{i-j}^\top \\+ \boldsymbol{u} \boldsymbol{W}_K^\top \boldsymbol{x}_j^\top + \boldsymbol{v} \boldsymbol{W}_{K,R}^\top \boldsymbol{R}_{i-j}^\top \tag{9}
+$$
+此外，$\boldsymbol{v}_j$上的位置偏置就直接去掉了，即直接令$\boldsymbol{o}_i = \sum_j a_{i,j} \boldsymbol{x}_j \boldsymbol{W}_V$。似乎从这个工作开始，**后面的相对位置编码都只加到Attention矩阵上去，而不加到$\boldsymbol{v}_j$上去了**。
+
+
+
+## T5式位置编码 
+
+T5模型出自文章[《Exploring the Limits of Transfer Learning with a Unified Text-to-Text Transformer》](https://papers.cool/arxiv/1910.10683)，里边用到了一种更简单的相对位置编码。思路依然源自展开式(7)，如果非要分析每一项的含义，那么可以分别理解为**“输入-输入”、“输入-位置”、“位置-输入”、“位置-位置”四项注意力的组合**。如果我们认为**输入信息与位置信息应该是独立（解耦）**的，那么它们就不应该有过多的交互，所以删掉**“输入-位置”、“位置-输入”**两项Attention，而
+
+$\boldsymbol{p}_i \boldsymbol{W}_Q \boldsymbol{W}_K^\top \boldsymbol{p}_j^\top$ 实际上只是一个只依赖于$(i,j)$的标量，我们可以直接将它作为参数训练出来，即简化为 $$ \boldsymbol{x}_i \boldsymbol{W}_Q \boldsymbol{W}_K^\top \boldsymbol{x}_j^\top + \beta_{i,j} \tag{10} $$ 说白了，它仅仅是在Attention矩阵的基础上加一个可训练的偏置项而已，而跟XLNET式一样，在\(\boldsymbol{v}j\)上的位置偏置则直接被去掉了。包含同样的思想的还有微软在ICLR 2021的论文《Rethinking Positional Encoding in Language Pre-training》中提出的TUPE位置编码。 
+比较“别致”的是，不同于常规位置编码对将$\beta{i,j}$视为$i-j$的函数并进行截断的做法，T5对相对位置进行了一个“**分桶**”处理，即相对位置是\(i-j\)的位置实际上对应的是$f(i-j)$位置，映射关系如下： 
+
+| $i-j$    | 0    | 1    | 2    | 3    | 4    | 5    | 6    | 7    |
+| -------- | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
+| $f(i-j)$ | 0    | 1    | 2    | 3    | 4    | 5    | 6    | 7    |
+| $i-j$    | 8    | 9    | 10   | 11   | 12   | 13   | 14   | 15   |
+| $f(i-j)$ | 8    | 8    | 9    | 9    | 9    | 9    | 9    | 9    |
+| $i-j$    | 16   | 17   | 18   | 19   | 20   | 21   | 22   | 23   |
+| $f(i-j)$ | 10   | 10   | 10   | 10   | 10   | 10   | 10   | 11   |
+| $i-j$    | 24   | 25   | 26   | 27   | 28   | 29   | 30   | …    |
+
+
+
+具体的映射代码，读者自行看源码就好。这个设计的思路其实也很直观，就是比较**邻近**的位置（0～7），我们需要比较得**精细**一些，所以给它们都分配一个**独立的位置编码**，至于**稍远的位置**（比如8～11），我们不用区分得太清楚，所以它们可以**共用一个位置编码，距离越远，共用的范围就可以越大，**直到达到指定范围再clip。
+
+## **DeBERTa的位置编码**
+
+论文地址[《DeBERTa: Decoding-enhanced BERT with Disentangled Attention》](https://papers.cool/arxiv/2006.03654)
+
+同样还是从 $$q_{i, k}^{j}$$展开式出发，**T5**干脆去掉了第2、3项，只保留第4项并替换为相对位置编码，而DeBERTa则刚刚相反，**扔掉了第4项，保留第2、3项并替换为相对位置编码**：
+
+$$q_{i, k}^{j} = x_{i} W_{Q} W_{K}^{T} x_{k}^{j} + x_{i} W_{Q} W_{K}^{T} R_{i, j}^{k} + R_{j, i}^{k} x_{i} W_{Q} W_{K}^{T} x_{k}^{j}$$
+
+DeBERTa提供了使用相对位置和绝对位置编码的一个新视角，它指出**NLP的大多数任务可能都只需要相对位置信息**，但确实**有些场景下绝对位置信息更有帮助**，于是它将整个模型分为两部分来理解。以Base版的MLM预训练模型为例，它一共有13层，前11层只是用相对位置编码，这部分称为Encoder，后面2层加入绝对位置信息，这部分它称之为Decoder，还弄了个简称EMD（Enhanced Mask Decoder）；至于下游任务的微调截断，则是使用前11层的Encoder加上1层的Decoder来进行（**需要注意的是他这里命名的encoder和decoder不是传统意义的，不要混淆了）**
+
+
+
+# RoPE和ALiBi
+
+## [**RoPE**](https://kexue.fm/archives/8265)
+
+[新一点的文章](https://www.zhihu.com/tardis/bd/art/647109286)
+
+旋转式位置编码 Rotary Position Embedding，通过**绝对位置编码的方式实现相对位置编码**，综合了绝对位置编码和相对位置编码的优点。主要就是对attention中的q, k向量注入了绝对位置信息，然后用**更新的q,k向量做attention中的内积就会引入相对位置信息**了。RoPE**广泛应用**在目前的大模型生态中
+
+原始的pos位置编码是做加法,RoPE做内积,而点积attention运算本身也是做内积,**分离出相对位置更容易**
+
+二维情况下，对于向量 $$\textbf{q}$$ 用复数表示的RoPE如下所示：
+
+$$   f(\textbf{q}, m) = R_f(\textbf{q}, m)e^{i\Theta_f(\textbf{q}, m)} = \|q\|e^{i(\Theta(\textbf{q}) + m\theta)} = \textbf{q}e^{im\theta}  $$
+
+根据**复数乘法的几何意义，该变换实际上对应着向量的旋**转，所以称之为“旋转式位置编码”，它还可以写成矩阵形式：
+
+$$f(\textbf{q}, m) = \begin{pmatrix} \cos m\theta & - \sin m\theta \\ \sin m\theta & \cos m\theta \end{pmatrix} \begin{pmatrix} q_{0} \\ q_{1} \end{pmatrix} $$
+
+由于**内积满足线性叠加性**，因此任意偶数维的RoPE，都可以表示为二维情形的拼接，即
+
+$$
+  R_m
+\begin{pmatrix}
+\cos m\theta & - \sin m\theta & 0 & 0 & \cdots & 0 & 0 \\
+\sin m\theta & \cos m\theta & 0 & 0 & \cdots & 0 & 0 \\
+0 & 0 & \cos m\theta & - \sin m\theta & \cdots & 0 & 0 \\
+0 & 0 & \sin m\theta & \cos m\theta & \cdots & 0 & 0 \\
+\vdots & \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\
+0 & 0 & 0 & 0 & \cdots & \cos m\theta & - \sin m\theta \\
+0 & 0 & 0 & 0 & \cdots & \sin m\theta & \cos m\theta
+\end{pmatrix}
+\begin{pmatrix}
+q_{0} \\
+q_{1} \\
+q_{2} \\
+q_{3} \\
+\vdots \\
+q_{d - 2} \\
+q_{d - 1}
+\end{pmatrix}
+$$
+
+
+也就是说，给位置为m的向量 $$\textbf{q}$$ 乘上矩阵 $$R_{m}$$、位置为n的向量k乘上矩阵 $$R_{n}$$，用变换后的Q、K序列做Attention，那么Attention就自动包含相对位置信息了，因为成立恒等式：
+
+$$(R_{m}q)^T (R_{n}k) = q^T R_{m}^T R_{n} k = q^T R_{m - n} k=RE[(q_me^{im\theta})(k_ne^{in\theta}*) =Re[q_mk^{*}_ne^{i(m-n)\theta}]$$
+通过添加绝对位置信息,但attention计算时却可以得到相对位置信息
+
+值得指出的是，**$$R_{m}$$是一个正交矩阵**，**它不会改变向量的模长**，因此通常来说它不会改变原模型的稳定性
+
+![](./note2.assets/image-6-1763014947444-1.png)
+
+## **ALiBi**
+
+> ALIBI所做的改动非常简单，只是在Softmax之前，将Attention的计算从 $$q_{m}^{T} k_{n}$$改为
+>
+> $$q_{m}^{T} k_{n} - \lambda |m - n| $$
+>
+> 其中 $$\lambda > 0$$是超参数，每个head设置不同的值。从这个定义就可以看出ALIBI跟**局部注意力**的相似之处了，两者都是在Softmax之前减去一个非负矩阵，只不过被减去的非负矩阵有所不同，ALIBI可以看成是**局部注意力**的“平滑版”
+>
+> ALiBi的偏置矩阵**根据q和k的相对距离来惩罚attention score，相对距离越大，惩罚项越大**。相当于两个token的距离越远，相互贡献就越小。
+>
+> **长度外推问题：**&#x957F;度外推性是一个训练和预测的长度不一致的问题
+>
+> * 预测的时候用到了**没训练过的位置编码**（不管绝对还是相对）
+>
+> * 预测的时候注意力机制所**处理的token数量远超训练时的数量**
+>
+> RoPE等周期震荡函数必须进行位置衰减，到远处的**位置信息趋于直线震荡，基本很难有位置信息区分了，所以外推性比训练式的好不了多少，旋转位置编码基于此改进的自然也是如此**
+
+![](./note2.assets/image-5-1763014947444-2.png)
+
+**局部注意力等效减去的矩阵**
+
+![](./note2.assets/image-9-1763014947444-3.png)
+
+**ALiBi减去的矩阵**
+
+![](./note2.assets/image-8-1763014947444-4.png)
+
+**ALiBi示意图**
+
+## 外推优化
+
+解决**训练和预测长度不一致**的问题,预测的时候**用到了没训练过的位置编码**
+预测的时候**注意力机制处理的token远超训练时的**
+
+### 1.局部attention(超强基线模型)
+
+用mask让token只能看到训练长度的其他token
+优点:数据分布符合训练情况
+缺点:重要信息在mask外时表现很糟糕
+
+**进制表示到直接外推**
