@@ -2,11 +2,11 @@ FFN
 
 
 
-![](./note2.assets/image-12-1762864512006-10.png)
+![](./4-5note.assets/image-12-1762864512006-10.png)
 
 ## **FFN 前馈层**
 
-![img](./note2.assets/c1d07cf3db29dcb31cd8bb6b24353e44.png)
+![img](./4-5note.assets/c1d07cf3db29dcb31cd8bb6b24353e44.png)
 
 其实就是fc->ReLu->fc,升维再降维,从而获取特征
 
@@ -42,7 +42,7 @@ resnet残差,防止过拟合
 
 * **Group Norm：**在通道（C）维度上进行分组归一化，通常用于替代 Batch Norm 以避免批次大小对模型性能的影响
 
-![](./note2.assets/image-11.png)
+![](./4-5note.assets/image-11.png)
 
 # **[Layer Norm的位置和计算](https://spaces.ac.cn/archives/8620)**
 
@@ -53,9 +53,9 @@ resnet残差,防止过拟合
 **Pre-norm(先对输入归一化，再做残差连接)**
 **Sandwich-norm(Attention、FFN 的前后都执行 Layer Norm)**
 
-![](./note2.assets/image-9.png)
+![](./4-5note.assets/image-9.png)
 
-![](./note2.assets/image-8.png)
+![](./4-5note.assets/image-8.png)
 
 梯度期望:
 
@@ -82,11 +82,11 @@ resnet残差,防止过拟合
 
 post-norm为什么不容易train
 
-![image-20251111214141647](./note2.assets/image-20251111214141647.png)
+![image-20251111214141647](./4-5note.assets/image-20251111214141647.png)
 
 Pre-norm的优势
 
-![image-20251111214247249](./note2.assets/image-20251111214247249.png)
+![image-20251111214247249](./4-5note.assets/image-20251111214247249.png)
 
 
 
@@ -102,7 +102,7 @@ $$\sigma \leftarrow \sqrt{\operatorname{Var}(x)}=\sqrt{\frac{1}{H} \sum_{i = 1}^
 
 $$y=\frac{x - E(x)}{\sqrt{\operatorname{Var}(X)}} \cdot \gamma+\beta$$
 
-![image-7](./note2.assets/image-7.png)
+![image-7](./4-5note.assets/image-7.png)
 
 
 
@@ -153,17 +153,17 @@ $$std=gain×\sqrt{\frac{2}{fan\_in+fan\_out}}$$
 >
 > * 在train模式下参数会随着网络的反向传播进行梯度更新，计算每一个batch里的方差和平均值，在eval模式，模型不可能等到预测样本数量达到一个batch时，再进行归一化，而是直接使用train模式得到的统计量
 
-![](./note2.assets/image-5.png)
+![](./4-5note.assets/image-5.png)
 
 ##  FFN-GLU计算和激活函数
 
 * 现在大模型**通常使用SwiGLU替换掉传统的FFN结构**
 
-![](./note2.assets/image-6.png)
+![](./4-5note.assets/image-6.png)
 
 **GLU**
 
-![](./note2.assets/image-3.png)
+![](./4-5note.assets/image-3.png)
 
 * **一般激活函数计的FFN块算公式：** $$FFN(x) = ReLU(xW_1+b1)W_2+b_2$$
 
@@ -200,7 +200,7 @@ $$std=gain×\sqrt{\frac{2}{fan\_in+fan\_out}}$$
 >   $$f(x) = \frac{1}{1+e^{-x}}\\
 >   f'(x) = f(x)f(1-x)$$
 
-![](./note2.assets/image-4.png)
+![](./4-5note.assets/image-4.png)
 
 
 
@@ -216,7 +216,7 @@ $$std=gain×\sqrt{\frac{2}{fan\_in+fan\_out}}$$
 >
 > $$f(x)=\frac{e^{x}-e^{-x}}{e^{x}+e^{-x}}$$
 
-![](./note2.assets/image-1.png)
+![](./4-5note.assets/image-1.png)
 
 ### **ReLU**
 
@@ -240,7 +240,7 @@ $$std=gain×\sqrt{\frac{2}{fan\_in+fan\_out}}$$
 
 
 
-![](./note2.assets/image.png)
+![](./4-5note.assets/image.png)
 
 ### **Leaky ReLU**
 
@@ -262,7 +262,7 @@ $$std=gain×\sqrt{\frac{2}{fan\_in+fan\_out}}$$
 
 
 
-![](./note2.assets/image-2.png)
+![](./4-5note.assets/image-2.png)
 
 ### **ELU**
 
@@ -283,7 +283,7 @@ $$std=gain×\sqrt{\frac{2}{fan\_in+fan\_out}}$$
 
 
 
-![](./note2.assets/image-17.png)
+![](./4-5note.assets/image-17.png)
 
 ### **Swish**
 
@@ -305,7 +305,7 @@ $$std=gain×\sqrt{\frac{2}{fan\_in+fan\_out}}$$
 
 
 
-![](./note2.assets/image-16.png)
+![](./4-5note.assets/image-16.png)
 
 
 
@@ -317,7 +317,7 @@ $$std=gain×\sqrt{\frac{2}{fan\_in+fan\_out}}$$
 
 
 
-![](./note2.assets/image-15.png)
+![](./4-5note.assets/image-15.png)
 
 # [位置编码](https://www.zhihu.com/tardis/zm/art/675243992)
 
@@ -361,7 +361,7 @@ $$std=gain×\sqrt{\frac{2}{fan\_in+fan\_out}}$$
 >
 > * **可视化：**&#x4E0B;图是长度为100，编码维度为512的序列的位置编码可视化，可以发现，由于sin/cos函数的性质，位置向量的每一个值都位于\[-1, 1]之间。同时，纵向来看，图的右半边几乎都是黄色的，这是因为**越往后的位置，频率越小，波长越长**，所以不同的t对最终的结果影响不大。而越往左边走，颜色交替的频率越频繁
 
-![](./note2.assets/image-10.png)
+![](./4-5note.assets/image-10.png)
 
 > * **Transformer位置编码的缺点：**由于**位置编码点积的无向性**， $$  P E_t^T * P E_{t+\Delta t} = P E_t^T * P E_{t - \Delta t}  $$ 即两个位置编码的乘积仅取决于 $$\Delta T$$，**距离是成对分布的，不能用来表示位置的方向性**。当随着input embedding被喂入attention的时候会出现**距离意识被破坏的现象**，即**正弦位置编码的相对位置表达能力被投影矩阵破坏掉了**，所以在后续BERT的改进中，采用了可学习的位置编码
 
@@ -473,7 +473,7 @@ DeBERTa提供了使用相对位置和绝对位置编码的一个新视角，它�
 
 原始的pos位置编码是做加法,RoPE做内积,而点积attention运算本身也是做内积,**分离出相对位置更容易**
 
-二维情况下，对于向量 $$\textbf{q}$$ 用复数表示的RoPE如下所示：
+二维情况下，对于向量 $$\textbf{q}$$ **用复数表示的RoPE**如下所示：
 
 $$   f(\textbf{q}, m) = R_f(\textbf{q}, m)e^{i\Theta_f(\textbf{q}, m)} = \|q\|e^{i(\Theta(\textbf{q}) + m\theta)} = \textbf{q}e^{im\theta}  $$
 
@@ -512,16 +512,21 @@ $$(R_{m}q)^T (R_{n}k) = q^T R_{m}^T R_{n} k = q^T R_{m - n} k=RE[(q_me^{im\theta
 通过添加绝对位置信息,但attention计算时却可以得到相对位置信息
 
 值得指出的是，**$$R_{m}$$是一个正交矩阵**，**它不会改变向量的模长**，因此通常来说它不会改变原模型的稳定性
+如下图,每两个dim进行一次旋转,**m是token 的 position**,**θ是dim/2 **而θ的取值参考了之前的论文,The paper suggests using $\theta_i = 10000^{\frac{2(i-1)}{d}}, i \in [1, 2, \dots, \frac{d}{2}]$ for the $\frac{d}{2}$ pairs of features.
 
-![](./note2.assets/image-6-1763014947444-1.png)
+![](./4-5note.assets/image-6-1763014947444-1.png)
+
+![image-20251114124820134](./4-5note.assets/image-20251114124820134.png)
+
+外推性:不像可学习的position embedding,不依赖之前出现的数据产生位置编码,因此**外推性能良好**
 
 ## **ALiBi**
 
-> ALIBI所做的改动非常简单，只是在Softmax之前，将Attention的计算从 $$q_{m}^{T} k_{n}$$改为
+> ALIBI(**Attention with Linear Bias**所做的改动非常简单，只是在Softmax之前，将Attention的计算从 $$q_{m}^{T} k_{n}$$改为
 >
 > $$q_{m}^{T} k_{n} - \lambda |m - n| $$
 >
-> 其中 $$\lambda > 0$$是超参数，每个head设置不同的值。从这个定义就可以看出ALIBI跟**局部注意力**的相似之处了，两者都是在Softmax之前减去一个非负矩阵，只不过被减去的非负矩阵有所不同，ALIBI可以看成是**局部注意力**的“平滑版”
+> 其中 **$$\lambda > 0$$是超参数，每个head设置不同的值**。从这个定义就可以看出ALIBI跟**局部注意力**的相似之处了，两者都是在Softmax之前减去一个非负矩阵，只不过被减去的非负矩阵有所不同，ALIBI可以看成是**局部注意力**的“平滑版”
 >
 > ALiBi的偏置矩阵**根据q和k的相对距离来惩罚attention score，相对距离越大，惩罚项越大**。相当于两个token的距离越远，相互贡献就越小。
 >
@@ -533,27 +538,189 @@ $$(R_{m}q)^T (R_{n}k) = q^T R_{m}^T R_{n} k = q^T R_{m - n} k=RE[(q_me^{im\theta
 >
 > RoPE等周期震荡函数必须进行位置衰减，到远处的**位置信息趋于直线震荡，基本很难有位置信息区分了，所以外推性比训练式的好不了多少，旋转位置编码基于此改进的自然也是如此**
 
-![](./note2.assets/image-5-1763014947444-2.png)
+![](./4-5note.assets/image-5-1763014947444-2.png)
 
 **局部注意力等效减去的矩阵**
 
-![](./note2.assets/image-9-1763014947444-3.png)
+![](./4-5note.assets/image-9-1763014947444-3.png)
 
 **ALiBi减去的矩阵**
 
-![](./note2.assets/image-8-1763014947444-4.png)
+![](./4-5note.assets/image-8-1763014947444-4.png)
+
+![image-20251114130709966](./4-5note.assets/image-20251114130709966.png)
 
 **ALiBi示意图**
+
+ALiBi :外推很优秀,窗口延展性最长,但是语言类任务中表现一般,泛用性不太好
 
 ## 外推优化
 
 解决**训练和预测长度不一致**的问题,预测的时候**用到了没训练过的位置编码**
-预测的时候**注意力机制处理的token远超训练时的**
+预测的时候**注意力机制处理的token远超训练时的**,直接进行外推通常会导致模型的**性能严重下降**
 
-### 1.局部attention(超强基线模型)
+### 局部attention(超强基线模型)
 
 用mask让token只能看到训练长度的其他token
 优点:数据分布符合训练情况
 缺点:重要信息在mask外时表现很糟糕
 
-**进制表示到直接外推**
+### **线性内插到进制转换**
+
+$f`(x,m)=f(x,\frac{mL}{L`})$,将超出训练时L的部分编码压缩至L内
+
+* **内插后需要微调**训练，以便**模型重新适应**拥挤的**映射关系**
+
+* 当处理范围进一步增大时，相邻差异则更小，且集中在个位数，剩下的百位、十位，还是保留了相邻差异为1**，内插方法使得不同维度的分布情况不一样，每个维度不对等，模型进一步学习难度也更大**
+
+
+
+![](./4-5note.assets/image-7-1763098716831-1.png)
+
+**进制转换：**&#x4E0D;用新增维度，又能保持相邻差距
+
+* 三个数字的10进制编码可以表示0\~999，**16进制可以表示0\~4095**，三维向量就可以覆盖目标范围，代价是**每个维度的数字从0～9变为0～15**
+
+* 原来训练好的模型已经学会了 875>874，而在16进制下同样有875>874，比较规则是一样的
+
+* 每个维度超过9之后(10～15)模型，由**于一般模型也有一定的泛化能力，所以每个维度稍微往外推一些是没问题，可以正常比较**，转换进制可能不微调原来模型也有效
+
+## PI(Positional Interpolation )[位置内插](https://blog.csdn.net/m0_37733448/article/details/154618123#:~:text=%E6%9C%AC%E6%96%87%E7%B3%BB%E7%BB%9F%E6%A2%B3%E7%90%86%E4%BA%86%E4%B8%BB%E6%B5%81%E4%BD%8D%E7%BD%AE%E7%BC%96%E7%A0%81%E6%96%B9%E6%B3%95%E7%9A%84%E6%BC%94%E8%BF%9B%E4%B8%8E%E4%BC%98%E5%8C%96%E8%B7%AF%E5%BE%84%EF%BC%9A%E4%BB%8E%E5%9F%BA%E7%A1%80%E7%9A%84%E6%AD%A3%E5%BC%A6%E7%BC%96%E7%A0%81%EF%BC%88SIN%EF%BC%89%E5%88%B0%E7%BA%BF%E6%80%A7%E5%81%8F%E5%B7%AE%E6%B3%A8%E6%84%8F%E5%8A%9B%EF%BC%88ALiBi%EF%BC%89%E3%80%81%E6%97%8B%E8%BD%AC%E4%BD%8D%E7%BD%AE%E7%BC%96%E7%A0%81%EF%BC%88RoPE%EF%BC%89%EF%BC%8C%E5%86%8D%E5%88%B0%E9%92%88%E5%AF%B9%E5%A4%96%E6%8E%A8%E9%97%AE%E9%A2%98%E7%9A%84%E4%BD%8D%E7%BD%AE%E6%8F%92%E5%80%BC%EF%BC%88PI%EF%BC%89%E5%92%8C%E7%A5%9E%E7%BB%8F%E6%AD%A3%E5%88%87%E6%A0%B8%EF%BC%88NTK%EF%BC%89%E6%96%B9%E6%B3%95%E3%80%82,%E9%87%8D%E7%82%B9%E5%89%96%E6%9E%90%E4%BA%86RoPE%E9%80%9A%E8%BF%87%E5%A4%8D%E6%95%B0%E6%80%9D%E6%83%B3%E5%AE%9E%E7%8E%B0%E7%9B%B8%E5%AF%B9%E4%BD%8D%E7%BD%AE%E7%BC%96%E7%A0%81%E7%9A%84%E5%88%9B%E6%96%B0%E8%AE%BE%E8%AE%A1%EF%BC%8C%E4%BB%A5%E5%8F%8API%E9%80%9A%E8%BF%87%E5%8E%8B%E7%BC%A9%E8%B6%85%E9%95%BF%E5%BA%8F%E5%88%97%E7%BC%96%E7%A0%81%E8%A7%A3%E5%86%B3%E5%A4%96%E6%8E%A8%E6%80%A7%E7%9A%84%E6%80%9D%E8%B7%AF%E3%80%82)
+
+语言模型通常是用**固定的上下文长度进行预训练**的，如何通过在**相对较少的数据量上进行微调来扩展上下文长度**，**位置插值将上下文长度扩展到预训练极限之外**
+
+RoPE（相对位置编码）使用正弦和余弦函数将位置信息嵌入到词汇向量的旋转矩阵中。然而，由于以下原因，RoPE直接外推会导致Attention Score显著增加：
+
+* **正弦和余弦函数的周期性：**
+
+  * **正弦和余弦函数是周期性的**，周期为 $$2\pi$$，在训练数据中，位置通常在一个相对较小的范围内（例如，0到512或0到2048），这些位置的编码值会保持在周期的某一部
+
+  * 当位置超出这个范围时（例如，位置变为3000或3500），编码值会进入正弦和余弦函数的另一个周期。由于这些函数的周期性，**这些位置的编码值可能与训练数据中的编码值非常不同**，导致模型在计算注意力分数时出现剧烈变化
+
+* **高频成分的影响：**
+  * 在RoPE编码中，较高维度的编码（即频率较高的正弦和余弦成分）会对**较大的位置变化更加敏感，这意味着，随着位置数值的增加，这些高频成分会迅速变化**
+
+  * 对于较大的位置值，**正弦和余弦函数的值可能会经历快速变化**，这种快速变化会导致Attention机制中query和key的点积（即Attention Score）出现显著波动、
+
+
+
+# TODO:后面外推部分看不明白
+
+YoRN NTK-Aware/Dynamic-NTK
+
+
+
+
+
+## **Positional Interpolation 位置内插**
+
+语言模型通常是用**固定的上下文长度进行预训练**的，如何通过在**相对较少的数据量上进行微调来扩展上下文长度**，**位置插值将上下文长度扩展到预训练极限之外**
+
+### **RoPE的问题**
+
+**直接外推会出现比较大的Attention Score**
+
+RoPE（相对位置编码）使用正弦和余弦函数将位置信息嵌入到词汇向量的旋转矩阵中。然而，由于以下原因，RoPE直接外推会导致Attention Score显著增加：
+
+* **正弦和余弦函数的周期性：**
+
+  * **正弦和余弦函数是周期性的**，周期为 $$2\pi$$，在训练数据中，位置通常在一个相对较小的范围内（例如，0到512或0到2048），这些位置的编码值会保持在周期的某一部
+
+  * 当位置超出这个范围时（例如，位置变为3000或3500），编码值会进入正弦和余弦函数的另一个周期。由于这些函数的周期性，**这些位置的编码值可能与训练数据中的编码值非常不同**，导致模型在计算注意力分数时出现剧烈变化
+
+* **高频成分的影响：**
+
+  * 在RoPE编码中，较高维度的编码（即频率较高的正弦和余弦成分）会对**较大的位置变化更加敏感，这意味着，随着位置数值的增加，这些高频成分会迅速变化**
+
+  * 对于较大的位置值，**正弦和余弦函数的值可能会经历快速变化**，这种快速变化会导致Attention机制中query和key的点积（即Attention Score）出现显著波动、
+
+> ### **Positional Interpolation 位置内插**
+>
+> * **关键思想：**&#x4E0D;进行外推，而是直接**将位置索引减小，使得最大位置索引与目标长度大小，即预训练阶段的先前上下文窗口限制相匹配。**&#x53EF;以在相邻的整数位置上插值位置编码，毕竟位置编码可以应用在非整数的位置上(而非在训练位置之外 进行外推)。下图所示，如果直接使用位置(2048,4096]进行推理，那么因为模型没有见过这一部分的位置，效果会出现灾难性的下降，就把\[0,4096]这个区间压缩到\[0,2048]，原先的1就变成了0.5，4096就变成了2048，这就是**位置内插法**，即把没见过的位置映射到见过的位置
+>
+> * **内插公式：**&#x5BF9;于绝对位置 $$m$$，缩放变成 $$  \frac{mL}{L'}  $$， $$L $$ 为原先支持的长度（如2048）， $$L' $$为需要扩展的长度（如4096），计算 query 和 key 的时候，就有 $$  f'_w(x_m, m, \theta_d) =  f_w(x_m,  g(m) , \theta_d)  $$，定义缩放比例 $$s = \frac{L'}{L}, g(m)=\frac{m}{s}$$
+>
+> * **PI之后是否微调：**&#x6548;果有所区别
+>
+>   * PI之后，在没有微调的情况下(在步骤0)，模型可以展示出一定的语言建模能力，如扩展到8192上下文窗口的困惑度<20所示(相比之下，直接外推方法导致困惑度>1000)
+>
+>   * PI之后，经过微调，**困惑度（perplexity）**&#x8FC5;速改善。 在200步时，模型超过了2048上下文窗口大小的原始模型困惑度，表明模型能够有效地使用比预训练设置更长的序列进行语言建模。 在1000步时，我们可以看到模型稳步改善，并取得了显著更好的困惑度
+>
+>     > **困惑度**（Perplexity）是自然语言处理中常用的一个评价指标，用于衡量语言模型的好坏。语言模型Model在测试集数据 $$T=\left\{w_{1}, w_{2}, \ldots, w_{N}\right\}$$上的困惑度计算，困惑度越低，说明模型对下一个单词的预测越准确，模型性能越好：
+>     >
+>     > &#x20;                    $$    \text{Perplexity}(Model)=\exp\left(-\frac{1}{N}\sum_{i = 1}^{N}\log P\left(w_{i}\mid w_{1}, \ldots, w_{i-1}\right)\right)$$
+>
+> * **PI的问题：**
+>
+>   * 三角函数 $$\sin(\omega x)$$，它的周期是 $$T = 2\pi / \omega$$对应到RoPE里的每个维度 $$(\sin m \theta_j,\cos m \theta_j)$$其中 $$\theta_j = 10000^{-2(j-1)/d},j \in [1, 2, \ldots, d/2]$$（$$m$$为位置，$$j$$为维度）
+>
+>   * 计算得到周期为： $$\frac{2\pi}{m}b^{\frac{2(j-1)}{d}}$$，其中，用 $$b$$表示base，即10000。从周期计算的公式可以知道，针对不同的维度编码 $$j$$，每个维度对应的三角函数周期是越来越大的（即对应到高频、低频）
+>
+>   * 如果插值是针对绝对位置 $$m$$，那么对每个维度 $$j$$都同等地生效；但是**周期小（高频）维度，插值之后会变得很密集（本来一个周期包含10个值，内插之后能包含20个值），这样高频的维度就变得很拥挤**
+
+![](./4-5note.assets/image-1-1763126643941-1.png)
+
+**PI示意图**
+
+![](./4-5note.assets/image-1763126643941-2.png)
+
+**PI之后微调区别示意图**
+
+## **NTK-aware 插值到 Dynamic NTK插值**
+
+> * **NTK-aware插值：**&#x6838;心思想 **高频外推，低频内插，**&#x4E0D;像PI针对所有维度平均缩放，而是减少对高频区域的缩放和增加对低频区域的缩放，从而将插值压力分散到多个维度
+>
+>   $$   \left[ \cos \left( \frac{m}{\beta^{0}} \right), \sin \left( \frac{m}{\beta^{0}} \right), \cos \left( \frac{m}{\beta^{1}} \right), \sin \left( \frac{m}{\beta^{1}} \right), \ldots, \cos \left( \frac{m}{\beta^{d/2-1}} \right), \sin \left( \frac{m}{\beta^{d/2-1}} \right) \right]  $$
+>
+>   * 上述公式最后面的是最低频 $$\frac{m}{\beta^{d/2-1}}$$，引入参数 $$\lambda$$变为 $$\frac{m}{(\lambda\beta)^{d/2-1}}$$，让这一项**与内插一致做缩放**：
+>
+>   $$\frac{m}{(\lambda\beta)^{d/2-1}}= \frac{m/s}{\beta^{d/2-1}}\\ 
+>   \lambda = s^{2/(d-2)}$$
+>
+>   * 上述公式最前面的是最高频 $$\frac{m}{\beta^0}$$，引入参数 $$\lambda$$变为 $$\frac{m}{(\lambda\beta)^0}$$，由于 $$d_{model}$$一般比较大，所以 $$\lambda$$很接近1，即**不做缩放等价于外推，从而NTK-aware插值把外推和内插结合起来**
+>
+>   * **缺点：**&#x4E00;些维度被轻微外推到超出边界的值，因此使用NTK-aware插值进行微调的结果有可能不如PI；此外，由于存在“越界”值，理论尺度因子s并不能准确描述真实的上下文扩展尺度。在实践中，对于给定的上下文长度扩展，尺度值s必须设置得高于预期尺度
+>
+> * **NTK-by-parts 插值：考虑了波长于上下文的关系**
+>
+>   * **波长：**&#x7EF4;度 $$j$$上嵌入的RoPE执行完整旋转 $$2\pi$$所需要的token长度 $$\lambda_j=\frac{2\pi}{\theta_j}=2\pi b^{\frac{2(j-1)}{d}}$$。PI和NTK-aware插值不关心波长的维数
+>
+>   * **存在问题：**&#x6709;一些维数的波长长于预训练期间看到的最大上下文长度 $$\lambda > L$$，这表明一些维数的嵌入可能在旋转域中不均匀分布。**当波长很长时，这些维度上的嵌入几乎不变，可以认为它们保持了绝对位置信息，即每个位置的嵌入不因相对位置变化而变化；当波长较短时，嵌入会在较短的距离内完成多次旋转，这使得这些维度上的嵌入反映的是相对位置信息，即它们可以捕捉到标记之间的相对距离变化。**&#x6B64;外，用比例s去对所有维度进行缩放的时候，所有tokens都变得更彼此接近，同样的位移对应的旋转角度变化减小，向量指向更加相似的方向，**这种缩放严重损害了LLM理解其内部嵌入之间的小型和局部关系的能力，**&#x5BFC;致模型在邻近标记的位置顺序上被混淆，从而损害模型的能力
+>
+>   * **解决方法：**
+>
+>     * 如果波长 $$\lambda$$ 比上下文长度 $$L $$ 小得多，此时不插值
+>
+>     * 如果波长 $$\lambda$$ 等于或大于上下文长度 $$L $$ ，此时只做插值，不做任何外推
+>
+>     * 两者之间的维数可以兼备
+>
+>     引入比率 $$r(j)=\frac{L}{\lambda_j}=\frac{L}{2\pi b^{\frac{2(j-1)}{d}}}$$，引入边界参数 $$\alpha,\beta$$，定义斜坡函数 $$ 
+>     \gamma(r) = 
+>     \begin{cases}
+>     0, & \text{if } r < \alpha \\
+>     1, & \text{if } r > \beta  \\
+>     \frac{r - \alpha}{\beta - \alpha}, & \text{otherwise}
+>     \end{cases}
+>      $$可以得到NTK-by-parts方法的公式：
+>
+>     $$g(m) = m\\
+>     h(\theta_j)=(1-\gamma(r(j)))\frac{\theta_j}{s} + \gamma(r(j))\theta_j$$
+>
+>     位置索引m不做变化，对不同维度的 $$\theta_j$$通过第二个公式进行调整
+>
+> * **Dynamic NTK 插值：动态调整缩放因子&#x20;**$$s$$
+>
+>   * **存在问题：**&#x5728;很多用例中，以从1到最大上下文大小不等的序列长度进行多次前向传递。一个典型的例子是自回归生成，其中序列长度在每一步之后递增1。之前的方法缩放因子不变，模型在长度小于 $$L$$时可能出现性能折扣，当序列长度大 $$L'$$时可能出现突然退化
+>
+>   * **动态插值：** $$s = max(1,l'/L)$$， $$l'$$是当前序列的长度
+
+## **YaRN (Yet another RoPE extensioN method)**
+
+> 无论数据样本和扩展上下文窗口上的token位置如何，在对logits进行softmax操作之前引入温度t可以统一地影响困惑度，所以可以将注意力权重的计算修改为：
+>
+> $$\text{softmax} \left(\frac{{\bf{q_m}}^T \bf{k_n}}{t\sqrt{d_k}} \right)$$
+>
+> 将RoPE嵌入按相同比例缩放，使得query和key都以 $$\sqrt{1/t}$$进行缩放，然后再结合NTK-by-parts方法得到YaRN，推理和训练阶段没有额外开销，因为RoPE嵌入是提前生成的，而且可以重复使用
+>
+> 对于LLaMA1，2推荐： $$\sqrt{1/t}=\text{0.1}\ln(s)+1$$
