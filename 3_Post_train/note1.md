@@ -21,7 +21,7 @@ $$D = \{(I_K,A_K)\}^N_{K=1}$$
 
 - pretrain 是在背书，纯粹的学习知识；sft 则是在做题，学习的是**指令遵循能力**。切**勿在 sft 阶段强行给模型做知识注入**，比如训个 50W 条的 code 数据，所有的**知识注入工作应该采用 continue-pretrain 的思路进行**，**否则都会使得模型的通用能力掉点明显**（**sft 做知识注入基本上是 100% 某个知识，但 continue-pretrain 做知识注入会控制在 10% ～ 20% 左右的比例**）
 
-![](note.assets/image-9.png)
+![](note1.assets/image-9.png)
 
 ## **1.2 SFT数据及处理**
 
@@ -58,7 +58,7 @@ $$D = \{(I_K,A_K)\}^N_{K=1}$$
 
 - **整体流程**
 
-![](note.assets/image-8.png)
+![](note1.assets/image-8.png)
 
 1. 数据收集：**首先，需要收集和获取大量的数据。这可以通过各种方式实现，例如用户近一个月赞踩、用户行为追踪、用户社交媒体数据等
 2. **数据存储和处理：**收集到的数据需要进行存储和处理，以便后续的分析和应用。这可能涉及到数据仓库、数据库、云存储等技术
@@ -108,7 +108,7 @@ IFD(Instruction-Following Difficulty)
 - **核心点**：**根据指令跟踪难度(IFD)筛选SFT数据**
 - **前置条件**：在使用精心选择的指令数据进行初步训练的阶段，LLM可以开发出一种内在的指令辨别能力，这种基础理解能力使他们具备了评估更广泛数据集质量的鉴别力，从而有可能以自我指导的方式评估指令执行难度。
 - **总体流程：**
-  ![img](note.assets/v2-97a97e66ee2e71ff6c7c02f0c0fbad6a_1440w.jpg)
+  ![img](note1.assets/v2-97a97e66ee2e71ff6c7c02f0c0fbad6a_1440w.jpg)
   - **第一步：**&#x4ECE;简单经验中学习，强迫模型首先熟悉目标数据集的一个子集，使**初始模型具备基本的指令跟随能力**。为了确保初始模型所遇到的指令足够多样性，在这些指令嵌入上使用K-Means，即在**每个聚类中只抽取几个实例**，在指令嵌入上生成100个聚类，并**在每个聚类中抽取10个实例**。然后只用这些样本对初始模型进行1个epoch的训练
 
  &#x20;                                            $$
@@ -134,7 +134,7 @@ $$
 
 最终，IFD的定义为 $$r_\theta(Q,A)=\frac{s_\theta(A|Q)}{s_\theta(A)}$$
 
-![](note.assets/image-6.png)
+![](note1.assets/image-6.png)
 
 #### **[MoDS过滤](https://zhuanlan.zhihu.com/p/671183709)**
 
@@ -148,11 +148,11 @@ $$
   - 利用奖励模型对结果进行评分，当分值小于 $$\beta$$时，说明初始模型不能对这些指令生成优质的回复，不具有处理这些类型指令的能力，获取必要性数据集(Data2)
   - 对Data2进行多样性筛选，获取增强指令数据集
 
-![](note.assets/image-4.png)
+![](note1.assets/image-4.png)
 
-![](note.assets/image-7.png)
+![](note1.assets/image-7.png)
 
-![](note.assets/image-5.png)
+![](note1.assets/image-5.png)
 
 ### **数据多样性探索**
 
@@ -186,7 +186,7 @@ $$
 
 这里可以参考项目：https://github.com/OFA-Sys/DiverseEvol
 
-![](note.assets/image-2.png)
+![](note1.assets/image-2.png)
 
 ### **开源数据集**
 
@@ -220,7 +220,7 @@ Firefly项目整理了如下指令数据集，并将其整理成统一的数据�
 
 > A Survey on Post-training of Large Language Models 论文中也总结了部分数据集如下：
 
-![](note.assets/image.png)
+![](note1.assets/image.png)
 
 ## 1.3 SFT训练
 
@@ -299,7 +299,7 @@ Firefly项目整理了如下指令数据集，并将其整理成统一的数据�
 3. **混合序列训练**：该工作**先在专业数据集**（代码、数学）上应用多任务学习，**然后在通用能力数据集上应用SFT**
 4. **双阶段混合微调**（DMT）：首先在专业数据集上应用SFT，这与混合序列训练策略的第一阶段相同。在第二阶段，使用混合数据源执行SFT，该数据源由普通数据以及不同比例的代码和数学数据`k（1，1/2，1/4，1/8，1/16，1/32）`组合而成。在**第二阶段加入代码和数学数据有助于模型回忆专业能力**
 
-![](note.assets/image-1.png)
+![](note1.assets/image-1.png)
 
 ### **多轮对话专项提升**
 
@@ -326,7 +326,7 @@ Firefly项目整理了如下指令数据集，并将其整理成统一的数据�
 
 假设我们有一个对话，其中 user 和 bot 交互了 3 轮，我们可以根据这个对话构建三个样本：
 
-![1763364691139](note.assets/1763364691139.png)
+![1763364691139](note1.assets/1763364691139.png)
 白色部分相当于prompt，对应的SFT的labels的token_ids用-100替换表示mask，进行SFT的时候不计算loss，只计算bot response部分的loss，这样的loss可以表示为：
 $$
 loss = \frac{1}{3}\left( \frac{l_1}{n_1} + \frac{l_2}{n_2} + \frac{l_3}{n_3} \right)
@@ -336,7 +336,7 @@ $$
 #### 多轮合并加速计算
 
 如果将三轮三个样本合并成一个样本，可以尝试这种构造形式。因为存在 causal attention mask，所以每个 token 只能看到前面的 token，计算上和之前是等价的。
-![1763365475951](note.assets/1763365475951.png)
+![1763365475951](note1.assets/1763365475951.png)
 但是这样有一个坑：如果还是按照刚才的方式构建 token_ids 和 labels，**loss 计算是有问题的**。pytorch中的 CrossEntropyLoss 计算 loss 按照下面的方法，默认是"mean"：
 $$
 \ell(x, y) = 
@@ -355,7 +355,7 @@ $$
 
 假设我们有两个对话，第一个是单轮对话，第二个是三轮对话。
 
-![1763366044922](note.assets/1763366044922.png)
+![1763366044922](note1.assets/1763366044922.png)
 
 **正确的 loss**：
 $$
