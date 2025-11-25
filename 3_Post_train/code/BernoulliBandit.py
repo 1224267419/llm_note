@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from sympy.core.random import sample
+
 
 class BernoulliBandit:
     def __init__(self, K):
@@ -133,13 +135,28 @@ class UCB(Solver):
             np.log(self.total_count) / (2 * (self.counts + 1)))  # 计算上置信界
         k = np.argmax(ucb)  # 选出上置信界最大的拉杆
         r = self.bandit.step(k)
+        # # 修正当前期望估计值
         self.estimates[k] += 1. / (self.counts[k] + 1) * (r - self.estimates[k])
         return k
 
 
+class ThompsonSampler(Solver):
+    """ Thompson采样算法,继承Solver类 """
+    def __init__(self, bandit):
+        super(ThompsonSampler, self).__init__(bandit)
+        self._a = np.ones(self.bandit.K)#表示每根拉杆奖励为1的次数
+        self._b = np.ones(self.bandit.K)#表示每根拉杆奖励为0的次数
+    def run_one_step(self):
+        samples=np.random.beta(self._a, self._b)#按beta分布采样一组奖励样本
+        k = np.argmax(samples)#选出奖励最大的拉杆
+        r = self.bandit.step(k)#获得本次动作的奖励
+        self._a[k] += r # 修改奖励次数
+        self._b[k] += (1-r) # 修改奖励次数
+        return k
+
 np.random.seed(1)
 coef = 1  # 控制不确定性比重的系数
-UCB_solver = UCB(bandit_10_arm, coef)
-UCB_solver.run(5000)
-print('上置信界算法的累积懊悔为：', UCB_solver.regret)
-plot_results([UCB_solver], ["UCB"])
+UCB_solver = ThompsonSampler(bb)
+UCB_solver.run(50000)
+print('汤普森算法的累积懊悔为：', UCB_solver.regret)
+plot_results([UCB_solver], ["tho"])
