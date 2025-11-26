@@ -238,13 +238,91 @@ $$
 
 ### 2.6 Action value
 
+State value: the average return the agent can get starting from a state,
+Action value: the average return the agent can get **starting from a state and taking an action**
+
+policy实际上就是选择action,所以我们更应该关注**Action value**
+
+Action value $q_{\pi}(s,a)$  Definition:
+
+-  $$q_\pi(s,a) = \mathbb{E}\left[G_t \mid S_t = s, A_t = a\right]$$ 
+  - $ q_\pi(s,a) $ is a function of the **state-action pair** $ (s,a)$
+  - $ q_\pi(s,a)$  depends on $\pi$  
+- It follows from the properties of conditional expectation that $$\underbrace{\mathbb{E}\left[G_t \mid S_t = s\right]}_{v_\pi(s)} = \sum_{a} \underbrace{\mathbb{E}\left[G_t \mid S_t = s, A_t = a\right]}_{q_\pi(s,a)} \pi(a|s)$$ 
+- Action value和State value的联系:$$v_\pi(s) = \sum_{a} \pi(a|s) q_\pi(s,a)$$
+
+![image-20251126204630479](./RL.assets/image-20251126204630479.png)
+
+注意,虽然当前策略 $\pi$ 告诉我们应当向右走(a2),但$q_{\pi}(s1,a_i)$不为0,实际上他们都是有对应的值而且可以优化的(假设碰壁时r=-1),因此非当前策略选择的路径的Action value ≠ 0
+
+## 3.Optimal Policy and Bellman Optimality Equation
+
+Core concepts:**optimal state value and optimal policy**
+A fundamental tool: the **Bellman optimality equation (BOE)**
+
+### 3.1: Motivatingexample-how to improvepolicies? 
+
+![image-20251126210630636](./RL.assets/image-20251126210630636.png)
+
+通过**选择action value更大的action,可以优化算法**,但是这里的s2,s3,s4的state value已经是最优的,所以才可以这样做,如果不是的话,应该怎么去判断?
 
 
 
+### 3. 2: Optimal policy and Bellman optimality equation 
 
-### 2.7 Summary
+上述问题实际上是**收敛的**,即对策略不断优化,**使其选择action value更大的action**,**最终会收敛到最优策略**,这就是**Bellman optimality equation 贝尔曼最优公式**
+
+#### **最优策略$\pi$的定义**
+
+if  $$v_{\pi_1}(s) \geq v_{\pi_2}(s) \quad \text{for all } s \in S$$ then  $\pi_1$ is "better" than$ \pi_2$.
+
+if  $\pi^*$ optimal(最优),  $$v_{\pi^*}(s) \geq v_{\pi}(s) \quad \text{for all } s \in S$$  
+
+###  BOE的定义
+
+$$v(s) = \max_{\pi} \sum_{a} \pi(a|s) \left( \sum_{r} p(r|s,a)r + \gamma \sum_{s'} p(s'|s,a)v(s') \right), \quad \forall s \in \mathcal{S}\\=\max_{\pi} \sum_{a} \pi(a|s)q(s,a)$$
+
+一般而言,$p(s’|s,a)$是固定的,而随机初始化的$v(s’)$也可以视为已知的,因此$q(s,a)$是已知的,因此我们能调整的部分即$\pi(s|a)$来最优化这部分
+
+通过一系列证明,可以得到在v最优$v^*$的前提下,对应的$\pi^{*}$是最优的,即最优策略
 
 
+
+对于一个contraction mapping压缩映射,不断使用迭代法,最终必然可以逼近一个不动点(f(x)=x的点) (即所谓的压缩映射),下面给出了三个结论,即 
+存在性,唯一性,迭代求解算法
+
+![image-20251126220257346](./RL.assets/image-20251126220257346.png)
+
+而BE本身也是一个压缩映射,因此可以得到唯一最优的$v^{*}$, 通过$v^{*}->\pi^{*}$
+($v^{*}$唯一,$\pi^{*}$不一定唯一)
+
+
+
+### 3. 3: More on the Bellman optimality equation
+
+![image-20251126222133080](./RL.assets/image-20251126222133080.png)
+
+对于BOE,要的就是已知红色部分,求黑色部分,其中System model一般是不可变的,一般可以调整的只有$r$和$$\gamma$$
+
+##### example
+
+![image-20251126222504472](./RL.assets/image-20251126222504472.png)
+
+![image-20251126222544974](./RL.assets/image-20251126222544974.png)
+
+在仅改变$\gamma$的情况下,最优策略发生了改变,
+
+从上述例子可以看到,$\gamma$较大的模型更加“**有远见**”
+
+![image-20251126223045696](./RL.assets/image-20251126223045696.png)
+
+而调整reward也可以使得策略可以绕过障碍
+
+$r^{*}=ar+b$如果对r做线性变换,实际上policy是不变的(线性映射可以很自然得出结论(a>0))
+
+### 3.4: Interesting properties of optimal policies 
+
+https://www.bilibili.com/video/BV1sd4y167NS?vd_source=82d188e70a66018d5a366d01b4858dc1&spm_id_from=333.788.videopod.episodes&p=13
 
 
 
