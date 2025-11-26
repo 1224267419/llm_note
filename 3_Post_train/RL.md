@@ -40,6 +40,7 @@ The return of this trajectory is the sum of all the rewards collected along the 
 	 $$\text{return} = 0 + 0 + 0 + 1 = 1$$
 	**better policy has a greater return**
 **discounted return** :return with discount rate
+折扣因子控制了智能体在选择当前动作时，**未来奖励的影响力**
  	$$ \begin{align*} \text{discounted return} &= 0 + \gamma 0 + \gamma^2 0 + \gamma^3 1 + \gamma^4 1 + \gamma^5 1 + \dots \\ &= \gamma^3(1 + \gamma + \gamma^2 + \dots) = \gamma^3 \frac{1}{1-\gamma}. \end{align*} $$
 	对于这个discounted return,他的值从之前的发散变成了收敛(有上界),这显然更有助于我们研究
 
@@ -70,25 +71,178 @@ episode**回合**:从任务开始到结束的**完整(different to trajectory)�
 
 ## 2.Bellman equation贝尔曼公式
 
-
-
 ### 2.1 Motivating examples动机
+
+![1764122162315](RL.assets/1764122162315.png)
+
+通过最高例子得到自举(bootstrapping)的定义:当前状态return依赖于其它状态(左脚踩右脚)
+
+跟据上文,按线性代数进行矩阵运算,有$\mathbf{v} = \mathbf{r} + \gamma \mathbf{P}\mathbf{v}$,这就是贝尔曼公式的一种形式
+**一个状态的value实际上依赖于其它状态的value**,通过这个公式,我们可以求解v和r的关系式(线性代数)
+
+### 
 
 ### 2.2 State value
 
-### 2.3 Bellman equation : Derivation
+定义:
+
+- $S_t \to A_t$ is governed by $\pi(A_t = a \mid S_t = s)$
+- $S_t, A_t \to R_{t+1}$ is governed by $p(R_{t+1} = r \mid S_t = s, A_t = a)$
+- $S_t, A_t \to S_{t+1}$ is governed by $p(S_{t+1} = s' \mid S_t = s, A_t = a)$
+- $G_t = R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \dots$
+
+跟据上述定义,我们可以得到state value 的定义,即对$G_t$求期望(均值)
+$v_\pi(s) = \mathbb{E}\left[ G_t \mid S_t = s \right]$
+
+
+
+return:对于单个trajectory的结果
+value state:对于**确定的策略**$\pi$,其return的期望
+
+### 2.3 Bellman equation : Derivation贝尔曼公式的推导 
+
+$$
+\begin{align*}
+G_t &= R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \dots \\
+&= R_{t+1} + \gamma \left( R_{t+2} + \gamma R_{t+3} + \dots \right) \\
+&= R_{t+1} + \gamma G_{t+1}
+\end{align*}
+$$
+Then, it follows from the definition of the state value that
+$$
+\begin{align*}
+v_\pi(s) &= \mathbb{E}\left[ G_t \mid S_t = s \right] \\
+&= \mathbb{E}\left[ R_{t+1} + \gamma G_{t+1} \mid S_t = s \right] \\
+&= \mathbb{E}\left[ R_{t+1} \mid S_t = s \right] + \gamma \mathbb{E}\left[ G_{t+1} \mid S_t = s \right]
+\end{align*}
+$$
+至于说是抽奖，所说的“同样的行为”是指现实世界中同样的操作，但对应概率世界的，里边的奖项是状态，你选择抽哪一个是行为，行为指的是选择而不是你抽的动作。
+
+第一部分immediate reward 的数学表示如下所示
+
+$\mathbb{E}[ R_{t+1} \mid S_t=s]\begin{align*}
+&= \sum_{a} \pi(a \mid s) \mathbb{E}\left[ R_{t+1} \mid S_t = s,\, A_t = a \right] \\
+&= \sum_{a} \pi(a \mid s) \sum_{r} p(r \mid s,\, a) r
+\end{align*}$
+
+第二部分future reward
+$$
+\begin{align*}
+\mathbb{E}\left[ G_{t+1} \mid S_t = s \right] &= \sum_{s'} \mathbb{E}\left[ G_{t+1} \mid S_t = s,\, S_{t+1} = s' \right] p(s' \mid s) \\
+&= \sum_{s'} \mathbb{E}\left[ G_{t+1} \mid S_{t+1} = s' \right] p(s' \mid s) \\
+&= \sum_{s'} v_\pi(s') p(s' \mid s) \\
+&= \sum_{s'} v_\pi(s') \sum_{a} p(s' \mid s,\, a) \pi(a \mid s)
+\end{align*}
+$$
+
+
+**重期望**:期望的期望等于总期望,分解复杂的期望变简单,前一个求和遍历所有状态,后一个求和遍历所有动作
+
+综上,贝尔曼公式的具体形式可以表示为下列狮子,并将$\pi(a|s)$提取出来
+$$
+\begin{align*}
+v_\pi(s) &= \mathbb{E}\left[ R_{t+1} \mid S_t = s \right] + \gamma \mathbb{E}\left[ G_{t+1} \mid S_t = s \right] \\
+&= \underbrace{\sum_{a} \pi(a \mid s) \sum_{r} p(r \mid s, a) r}_{\text{mean of immediate rewards}} + \gamma \underbrace{\sum_{a} \pi(a \mid s) \sum_{s'} p(s' \mid s, a) v_\pi(s')}_{\text{mean of future rewards}} \\
+&= \sum_{a} \pi(a \mid s) \left[ \sum_{r} p(r \mid s, a) r + \gamma \sum_{s'} p(s' \mid s, a) v_\pi(s') \right], \quad \forall s \in \mathcal{S}
+\end{align*}
+$$
+最后一步把 “即时奖励” 和 “未来价值” 合并到同一个动作的求和里,**对每个动作a，先计算 “选a的即时奖励期望 + 选a的未来价值期望”，再按策略选a的概率加权求和，就是当前状态s的价值**。
+
+总结:贝尔曼公式实际上就是在描述不同状态间state value之间的关系
+
+对应的Markdown格式（包含LaTeX公式）如下：
+
+Put all these equations for all the states together and rewrite to a matrix-vector form
+
+$$v_\pi = r_\pi + \gamma P_\pi v_\pi$$
+
+where
+- $v_\pi = \left[ v_\pi(s_1), \dots, v_\pi(s_n) \right]^T \in \mathbb{R}^n$ 状态价值
+- $r_\pi = \left[ r_\pi(s_1), \dots, r_\pi(s_n) \right]^T \in \mathbb{R}^n$ 即时奖励期望
+- $P_\pi \in \mathbb{R}^{n \times n}$, 状态转移概率矩阵
 
 ### 2.4 Bellman equation : Matrix-vector form
 
+详细写出结果如下所示
+$$
+\begin{bmatrix}
+v_\pi(s_1) \\
+v_\pi(s_2) \\
+v_\pi(s_3) \\
+v_\pi(s_4)
+\end{bmatrix}
+=
+\begin{bmatrix}
+r_\pi(s_1) \\
+r_\pi(s_2) \\
+r_\pi(s_3) \\
+r_\pi(s_4)
+\end{bmatrix}
++ \gamma
+\begin{bmatrix}
+p_\pi(s_1 \mid s_1) & p_\pi(s_2 \mid s_1) & p_\pi(s_3 \mid s_1) & p_\pi(s_4 \mid s_1) \\
+p_\pi(s_1 \mid s_2) & p_\pi(s_2 \mid s_2) & p_\pi(s_3 \mid s_2) & p_\pi(s_4 \mid s_2) \\
+p_\pi(s_1 \mid s_3) & p_\pi(s_2 \mid s_3) & p_\pi(s_3 \mid s_3) & p_\pi(s_4 \mid s_3) \\
+p_\pi(s_1 \mid s_4) & p_\pi(s_2 \mid s_4) & p_\pi(s_3 \mid s_4) & p_\pi(s_4 \mid s_4)
+\end{bmatrix}
+\begin{bmatrix}
+v_\pi(s_1) \\
+v_\pi(s_2) \\
+v_\pi(s_3) \\
+v_\pi(s_4)
+\end{bmatrix}
+$$
+
+
 ### 2.5 Bellman equation : Solve the state values
+
+通过state values,我们才能评价一个策略到底是好还是不好
+
+对应的Markdown格式（含LaTeX公式）如下：
+
+```markdown
+- The closed-form solution is:
+  $$v_\pi = (I - \gamma P_\pi)^{-1} r_\pi$$
+
+  In practice, we still need to use numerical tools to calculate the matrix inverse.
+  Can we avoid the matrix inverse operation? Yes, by iterative algorithms.
+
+
+- An **iterative solution** is:
+  $$v_{k+1} = r_\pi + \gamma P_\pi v_k$$
+
+  This algorithm leads to a sequence $\{v_0, v_1, v_2, \dots\}$. We can show that
+  $$v_k \to v_\pi = (I - \gamma P_\pi)^{-1} r_\pi, \quad k \to \infty$$
+```
+
+渲染后效果：
+- The closed-form solution is:闭式解
+  $$v_\pi = (I - \gamma P_\pi)^{-1} r_\pi$$
+
+  In practice, we still need to use numerical tools to calculate the matrix inverse.
+  Can we avoid the matrix inverse operation? Yes, by iterative algorithms.
+
+
+- An **iterative solution** is:迭代算法
+  $$v_{k+1} = r_\pi + \gamma P_\pi v_k$$
+
+  This algorithm leads to a sequence $\{v_0, v_1, v_2, \dots\}$. We can show that
+  $$v_k \to v_\pi = (I - \gamma P_\pi)^{-1} r_\pi, \quad k \to \infty$$
+
+闭式解:仅适用于**极小状态空间**,计算量为$O(n^3)$,转移矩阵较大时不好用
+迭代解:适用于任意空间,时间复杂度为$O(n^2)$,环境变化时可直接基于当前 *v**k* 继续迭代更新，实时性强
+
+一般而言**迭代解**更常用(计算量更小,而且证明可知迭代解是收敛的)
+
+
 
 ### 2.6 Action value
 
+
+
+
+
 ### 2.7 Summary
-
-第一部分我们推导贝尔曼
-
-[TODO](https://www.bilibili.com/video/BV1sd4y167NS?spm_id_from=333.788.player.switch&vd_source=82d188e70a66018d5a366d01b4858dc1&p=4)6:32
 
 
 
