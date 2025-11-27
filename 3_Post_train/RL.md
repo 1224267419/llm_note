@@ -67,7 +67,8 @@ episode**回合**:从任务开始到结束的**完整(different to trajectory)�
 - **State transition probability:** at state  $s$ , taking action  $a$ , the probability to transit to state  $s'$  is  $p(s'|s,a) $  
 - **Reward probability:** at state  $s $, taking action  $a$ , the probability to get reward  $r$  is  $p(r|s,a)$  
 - **Policy:** at state  s , the probability to choose action  a  is  $\pi(a|s)$  
-- **Markov property:** memoryless property  $$  \begin{align*}  p(s_{t+1}|a_{t+1}, s_t, \dots, a_1, s_0) &= p(s_{t+1}|a_{t+1}, s_t), \\  p(r_{t+1}|a_{t+1}, s_t, \dots, a_1, s_0) &= p(r_{t+1}|a_{t+1}, s_t).  \end{align*}  $$  All the concepts introduced in this lecture can be put in the framework in MDP.
+- **Markov property:** memoryless property  
+- $$  \begin{align*}  p(s_{t+1}|a_{t+1}, s_t, \dots, a_1, s_0) &= p(s_{t+1}|a_{t+1}, s_t), \\  p(r_{t+1}|a_{t+1}, s_t, \dots, a_1, s_0) &= p(r_{t+1}|a_{t+1}, s_t).  \end{align*}  $$  All the concepts introduced in this lecture can be put in the framework in MDP.
 
 ## 2.Bellman equation贝尔曼公式
 
@@ -248,8 +249,10 @@ Action value $q_{\pi}(s,a)$  Definition:
 -  $$q_\pi(s,a) = \mathbb{E}\left[G_t \mid S_t = s, A_t = a\right]$$ 
   - $ q_\pi(s,a) $ is a function of the **state-action pair** $ (s,a)$
   - $ q_\pi(s,a)$  depends on $\pi$  
-- It follows from the properties of conditional expectation that $$\underbrace{\mathbb{E}\left[G_t \mid S_t = s\right]}_{v_\pi(s)} = \sum_{a} \underbrace{\mathbb{E}\left[G_t \mid S_t = s, A_t = a\right]}_{q_\pi(s,a)} \pi(a|s)$$ 
-- Action value和State value的联系:$$v_\pi(s) = \sum_{a} \pi(a|s) q_\pi(s,a)$$
+-  It follows from the properties of conditional expectation that $$\underbrace{\mathbb{E}\left[G_t \mid S_t = s\right]}_{v_\pi(s)} = \sum_{a} \underbrace{\mathbb{E}\left[G_t \mid S_t = s, A_t = a\right]}_{q_\pi(s,a)} \pi(a|s)$$ 
+-  Action value和State value的联系:$$v_\pi(s) = \sum_{a} \pi(a|s) q_\pi(s,a)$$
+
+下图中a1-a5分别为**上右下左中**顺时针方向
 
 ![image-20251126204630479](./RL.assets/image-20251126204630479.png)
 
@@ -323,6 +326,159 @@ $r^{*}=ar+b$如果对r做线性变换,实际上policy是不变的(线性映射�
 ### 3.4: Interesting properties of optimal policies 
 
 https://www.bilibili.com/video/BV1sd4y167NS?vd_source=82d188e70a66018d5a366d01b4858dc1&spm_id_from=333.788.videopod.episodes&p=13
+
+## 4.Value Iteration and Policy Iteration值迭代和策略迭代
+
+### 4.1 值迭代
+
+**接迭代优化价值函数（跳过精确的策略评估），待价值函数收敛后，一次性提取最优策略。**
+
+公式:$v_{k+1}=f(v_k)=\max_\pi(r_\pi+\gamma P_\pi v_k),\quad k=1,2,3\ldots $通过该迭代算法,从而可以找到最优策略
+
+- Step 1: policy update.  This step is to solve (根据v优化$\pi$)
+
+  ​		$$\pi_{k+1} = \arg\max_{\pi} \left(r_\pi + \gamma P_\pi v_k\right)$$ 
+
+  where  $v_k $ is given.  ,$$\pi_{k+1}(a|s) =  \begin{cases}  1 & a = a^*_k(s) \\ 0 & a \neq a^*_k(s) \end{cases}$$ 通过这种**greedy**方式优化
+
+- Step 2: value update.  (根据新$\pi$计算新$v$)
+
+  ​		$$v_{k+1} = r_{\pi_{k+1}} + \gamma P_{\pi_{k+1}} v_k$$
+
+当$||v_k-v_{k-1}||$很小时,可以认为迭代已经收敛
+
+
+
+### 4.2策略迭代
+
+**先精确计算当前策略的价值函数，再基于该价值函数优化策略**
+
+Step 1: policy evaluation (PE) 
+This step is to calculate the state value of $ \pi_k $  ($v_{\pi k}$): 
+	$$v_{\pi_k} = r_{\pi_k} + \gamma P_{\pi_k} v_{\pi_k}$$ 
+Note that \( v_{\pi_k} \) is a state value function.  _
+
+Step 2: policy improvement (PI) ,
+	$$\pi_{k+1} = \arg\max_{\pi} \left(r_\pi + \gamma P_\pi v_{\pi_k}\right)$$  
+$$ \pi_{k+1}(s) = \arg\max_{\pi} \sum_{a} \pi(a|s) \underbrace{\left( \sum_{r} p(r|s,a)r + \gamma \sum_{s'} p(s'|s,a)v_{\pi_k}(s') \right)}_{q_{\pi_k}(s,a)}, \quad s \in S. $$ Here, $q_{\pi_k}(s,a)$ is the **action value under policy** $\pi_k$.
+
+ Let $$ a_k^*(s) = \arg\max_{a} q_{\pi_k}(a,s) $$  
+
+$pi_{k+1}=1 if a=a^{*}_{k}(s)$
+
+优化流程:$$\pi_0 \xrightarrow{PE} v_{\pi_0} \xrightarrow{PI} \pi_1 \xrightarrow{PE} v_{\pi_1} \xrightarrow{PI} \pi_2 \xrightarrow{PE} v_{\pi_2} \xrightarrow{PI} \dots$$
+
+由于优化的结果依赖于其他状态
+
+
+
+
+
+### 4.3Truncated policy iteration algorithm截断策略迭代
+
+![image-20251127200916647](./RL.assets/image-20251127200916647.png)
+
+上述两种方法的比较
+
+![image-20251127201624565](./RL.assets/image-20251127201624565.png)
+
+policy iteration和value iteration 分别用∞次和1次迭代来求出状态最优价值$v_{\pi_1}$,那**二者中间会不会存在一个中间步**,即**Truncated policy iteration**,它截断了迭代流程,得到 $$\bar{v}_1$$
+
+伪代码如下:
+
+![image-20251127202458723](./RL.assets/image-20251127202458723.png)
+
+由于policy iteration和value iteration都收敛,因此Truncated policy iteration必然也收敛
+
+![image-20251127202840619](./RL.assets/image-20251127202840619.png)
+
+
+
+## 5.Monte Carlo Learning蒙特卡洛MC
+
+前面提到的方法都是model-base的:system已知,求解最优策略
+
+而**蒙特卡洛法是model-free**的,不需要事先知道所有的system状态.如根据data来predict
+
+example1:掷硬币: $$\mathbb{E}[X] \approx \boldsymbol{\bar{x}} = \frac{1}{\boldsymbol{N}} \sum_{j=1}^{\boldsymbol{N}} x_j.$$ 通过大数定律,在N较大时有较大的P估计准确
+
+### 5.1MC Basic
+
+从policy-iteration修改得到MC-basic
+
+策略迭代的公式： $$ \begin{cases} \text{Policy evaluation: } v_{\pi_k} = r_{\pi_k} + \gamma P_{\pi_k} v_{\pi_k} \\ \text{Policy improvement: } \pi_{k+1} = \arg\max_{\pi} \left( r_{\pi} + \gamma P_{\pi} v_{\pi_k} \right) \end{cases} $$ 
+
+PI部分可以写成
+
+$$ \begin{align*} \pi_{k+1}(s) &= \arg\max_{\pi} \sum_{a} \pi(a|s) \left[ \sum_{r} p(r|s,a)r + \gamma \sum_{s'} p(s'|s,a)v_{\pi_k}(s') \right] \\ &= \arg\max_{\pi} \sum_{a} \pi(a|s) q_{\pi_k}(s,a), \quad s \in \mathcal{S} \end{align*} $$ 
+
+而model-free问题的一大挑战就是:如何得到$q_{\pi_k}(s,a), \quad s \in \mathcal{S}$,毕竟s不确定
+
+所以我们使用已有的数据来估计模型,这其实就是大数定理，用很多次采样的平均值近似作为$G_t$的平均值，同时这样的方法因为理论上**在采样无穷的时候等价于无偏估计**
+
+$$ q_{\pi_k}(s,a) = \mathbb{E}\left[ G_t \mid S_t = s, A_t = a \right] \approx \frac{1}{N} \sum_{i=1}^{N} g^{(i)}(s,a). $$ 
+
+虽然理论上N->∞时可以做到,但是它是**low efficiency**的
+而且在MC中我们不再依赖于state value 得到action value 因为$q_{\pi_k}$已经是估计值了,如果按policy iteration的方法再从sv->av显然误差会很大
+
+### 5.2MC Exploring Starts
+
+相较于MCB方法,效率更高:
+
+ **用单个episode去立即估计action value,从而improve policy**,(有点类似一个epoch优化一次和一个batch优化一次的感觉,而实际上可以证明也是收敛的)
+
+Generalized policy iteration GPI:PE-PI-PE-PI…交替进行
+
+ 轨迹与动作价值估计 原始轨迹： $$s_1 \xrightarrow{a_2} s_2 \xrightarrow{a_4} s_1 \xrightarrow{a_2} s_2 \xrightarrow{a_3} s_5 \xrightarrow{a_1} \dots \quad \text{[original episode]}$$  
+	$$s_2 \xrightarrow{a_4} s_1 \xrightarrow{a_2} s_2 \xrightarrow{a_3} s_5 \xrightarrow{a_1} \dots \quad \text{[episode starting from } (s_2,a_4)\text{]}$$ 			$$s_1 \xrightarrow{a_2} s_2 \xrightarrow{a_3} s_5 \xrightarrow{a_1} \dots \quad \text{[episode starting from } (s_1,a_2)\text{]}$$ 				$$s_2 \xrightarrow{a_3} s_5 \xrightarrow{a_1} \dots \quad \text{[episode starting from } (s_2,a_3)\text{]}$$ 					$$s_5 \xrightarrow{a_1} \dots \quad \text{[episode starting from } (s_5,a_1)\text{]}$$  
+
+可估计的动作价值： $$q_{\pi}(s_1,a_2),\ q_{\pi}(s_2,a_4),\ q_{\pi}(s_2,a_3),\ q_{\pi}(s_5,a_1),\dots$$ 
+
+**first-visit** :访问过的action记住其action value,**从而减少重复计算**(空间换时间)
+
+**Exploring Starts**:因为可能未被选择的(s,a)里面存在最优解,要求探索每一个(s,a)作为start,这正是名字由来
+
+下面是伪代码
+
+#### ![image-20251127223946750](./RL.assets/image-20251127223946750.png)
+
+
+
+### 5.3MC Epsilon-Greedy
+
+soft-policy:可能采取any action的policy
+
+**若干个足够长**的episode能够对(s,a)进行**足够多次的访问**。此时，我们无需让大量action从每个(s,a)开始,此时便可去掉**Exploring Starts**这个条件
+
+https://www.bilibili.com/video/BV1sd4y167NS?vd_source=82d188e70a66018d5a366d01b4858dc1&spm_id_from=333.788.player.switch&p=20 1:10
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
