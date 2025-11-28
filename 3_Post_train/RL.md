@@ -429,7 +429,7 @@ $$ q_{\pi_k}(s,a) = \mathbb{E}\left[ G_t \mid S_t = s, A_t = a \right] \approx \
 
 Generalized policy iteration GPI:PE-PI-PE-PI…交替进行
 
- 轨迹与动作价值估计 原始轨迹： $$s_1 \xrightarrow{a_2} s_2 \xrightarrow{a_4} s_1 \xrightarrow{a_2} s_2 \xrightarrow{a_3} s_5 \xrightarrow{a_1} \dots \quad \text{[original episode]}$$  
+ 轨迹与动作价值估计 原始轨迹： $$s_1 \xrightarrow{a_2} s_2 \xrightarrow{a_4} s_1 \xrightarrow{a_2} s_2 \xrightarrow{a_3} s_5 \xrightarrow{a_1} \dots \quad \text{[original episode]}$$ 
 	$$s_2 \xrightarrow{a_4} s_1 \xrightarrow{a_2} s_2 \xrightarrow{a_3} s_5 \xrightarrow{a_1} \dots \quad \text{[episode starting from } (s_2,a_4)\text{]}$$ 			$$s_1 \xrightarrow{a_2} s_2 \xrightarrow{a_3} s_5 \xrightarrow{a_1} \dots \quad \text{[episode starting from } (s_1,a_2)\text{]}$$ 				$$s_2 \xrightarrow{a_3} s_5 \xrightarrow{a_1} \dots \quad \text{[episode starting from } (s_2,a_3)\text{]}$$ 					$$s_5 \xrightarrow{a_1} \dots \quad \text{[episode starting from } (s_5,a_1)\text{]}$$  
 
 可估计的动作价值： $$q_{\pi}(s_1,a_2),\ q_{\pi}(s_2,a_4),\ q_{\pi}(s_2,a_3),\ q_{\pi}(s_5,a_1),\dots$$ 
@@ -446,29 +446,42 @@ Generalized policy iteration GPI:PE-PI-PE-PI…交替进行
 
 ### 5.3MC Epsilon-Greedy
 
-soft-policy:可能采取any action的policy
+soft-policy:在任意状态下,有可能采取any action的概率的policy
 
 **若干个足够长**的episode能够对(s,a)进行**足够多次的访问**。此时，我们无需让大量action从每个(s,a)开始,此时便可去掉**Exploring Starts**这个条件
 
-https://www.bilibili.com/video/BV1sd4y167NS?vd_source=82d188e70a66018d5a366d01b4858dc1&spm_id_from=333.788.player.switch&p=20 1:10
+#### Epsilon-Greedy
+
+$$
+\pi(a \mid s) =
+\begin{cases}
+1 - \frac{\varepsilon}{|\mathcal{A}(s)|} \cdot \left( |\mathcal{A}(s)| - 1 \right), & \text{for the greedy action}, \\
+\frac{\varepsilon}{|\mathcal{A}(s)|}, & \text{for the other } |\mathcal{A}(s)| - 1 \text{ actions}.
+\end{cases}
+$$
 
 
 
+$\frac{\epsilon}{n}$概率选随机策略,否则用贪心策略
+
+使用Epsilon-Greedy而非Greedy,可以平衡exploitation(基于已有经验，选择当前已知能带来最大收益（或价值）的动作，优先获取确定收益) and exploration(尝试未知动作以发现更优策略)
+
+$\epsilon=0$:greedy ; $\epsilon=1$:random
 
 
 
+综上,MC Epsilon-Greedy和MC Basic的区别仅仅只在策略选择时加上Epsilon-Greedy即可,其余不变
+
+$$
+\bar{\pi}_{k+1}(a \mid s) =
+\begin{cases}
+1 - \frac{|\mathcal{A}(s)| - 1}{|\mathcal{A}(s)|} \varepsilon, & a = a^*_k, \\
+\frac{1}{|\mathcal{A}(s)|} \varepsilon, & a \neq a^*_k.
+\end{cases}
+$$
 
 
-
-
-
-
-
-
-
-
-
-
+![1764315438415](RL.assets/1764315438415.png)
 
 
 
