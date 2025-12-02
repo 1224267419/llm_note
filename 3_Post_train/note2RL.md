@@ -228,9 +228,71 @@ SARSA-λ则采用两者折中的方法，考虑多步时序差分：
 
 $$Q(s_t,a_t) \leftarrow Q(s_t,a_t) + \alpha [r_t + \gamma r_{t + 1} + \cdots + \gamma^n Q(s_{t + n},a_{t + n}) - Q(s_t,a_t)]$$
 
+#### **Expected Sarsa**
 
+Expected Sarsa 是基础 Sarsa 的改进版，核心思路是：**用 “后续状态下所有动作的期望动作值” 替代基础 Sarsa 中 “单个随机后续动作的动作值”**，从而减少随机噪声带来的估计方差。其中，期望动作值的计算的是当前策略π：下，$s_{t+1}$状态所有可能动作的动作值加权和（权重为策略的动作选择概率)：
+$\mathbb{E}_{\pi_t}\left[q_t(s_{t+1},A)\right]=\sum_{a\in\mathcal{A}(s_{t+1})}\pi_t(a\mid s_{t+1})\cdot q_t(s_{t+1},a)$
+
+#### **n-step Sarsa**
+
+n-step Sarsa 是基础 Sarsa 的**广义推广**，核心思路是：结合 “n 步奖励之和 + 第 n 步的动作值估计” 来更新动作值，实现基础 Sarsa（n=1）与蒙特卡洛（MC）学习（n=∞）的统一。
+
+你可以用以下 Markdown 格式呈现这段 n-step Sarsa 的公式与定义（包含 LaTeX 公式排版）：  其中，n-step Sarsa 的动作值更新公式
+
+为： $$ q_{t+n}(s_t, a_t) = q_{t+n-1}(s_t, a_t) - \alpha_{t+n-1}(s_t, a_t) \left[ q_{t+n-1}(s_t, a_t) - G_t^{(n)} \right] $$  
+求解:$q_{t+1}(s_t,a_t)=q_t(s_t,a_t)-\alpha_t(s_t,a_t)\Big[q_t(s_t,a_t)-[r_{t+1}+\gamma r_{t+2}+\cdots+\gamma^nq_t(s_{t+n},a_{t+n})]\Big]$
+
+**n-step 回报（n-step return）** $G_t^{(n)}$ 是该更新的核心目标，其定义为： 
+
+$$ G_t^{(n)} = r_{t+1} + \gamma r_{t+2} + \gamma^2 r_{t+3} + \dots + \gamma^{n-1} r_{t+n} + \gamma^n q_{t+n-1}(s_{t+n}, a_{t+n}) $$ 
+
+MC的G:$\mathsf{MC}\longleftarrow\quad G_{t}^{(\infty)}=R_{t+1}+\gamma R_{t+2}+\gamma^{2}R_{t+3}+\ldots $因此可以视为MC+Sarsa
+
+
+
+| 对比维度          | Expected Sarsa                                     | n-step Sarsa                                            |
+| ----------------- | -------------------------------------------------- | ------------------------------------------------------- |
+| 核心改进点        | 用 “动作值期望” 替代 “单个动作值”（降方差）        | 用 “n 步回报” 替代 “1 步回报”（方差 / 偏差权衡）        |
+| 样本依赖          | **1 步样本**（*$s_t$*,*$a_t$* ,$r_{t+1},s_{t+1}$） | n 步样本（*$s_t$*,*$a_t$* 至 *$s_{t+n}$*,*$a_{t+n}$* ） |
+| 更新时机          | 即时更新（时刻 t+1）                               | 延迟更新（时刻 t+n）                                    |
+| 方差 / 偏差       | 低方差、中等偏差                                   | 随 n 增大：方差升高、偏差降低                           |
+| 计算复杂度        | 依赖动作空间大小（求和计算期望）                   | 依赖 n 大小（**缓存 n 步样本** + 计算 n 步回报）        |
+| 与基础 Sarsa 关系 | 同阶变体（更新目标的计算方式不同）                 | 广义推广（更新步长的扩展）                              |
+
+ 
 
 #### **Q-learning算法**
+
+$\begin{aligned}&q_{t+1}(s_t,a_t)=q_t(s_t,a_t)-\alpha_t(s_t,a_t)\left[q_t(s_t,a_t)-[r_{t+1}+\gamma\max_{a\in\mathcal{A}}q_t(s_{t+1},a)]\right],\\&q_{t+1}(s,a)=q_t(s,a),\quad\forall(s,a)\neq(s_t,a_t),\end{aligned}$
+
+- The TD target in Q-learning is $\hat{r}_{t+1} + \gamma \max_{a \in \mathcal{A}} q_t(s_{t+1}, a)$  对a做优化
+- The TD target in Sarsa is $r_{t+1} + \gamma q_t(s_{t+1}, a_{t+1})$.  选择一个新的$a_{t+1}$
+
+- $\max_{a'} q_t(s_{t+1}, a')$：Q-learning 的**核心 TD 目标**——直接取“下一状态 $s_{t+1}$ 下所有动作的**最大动作值**”（对应目标策略的贪婪选择）；
+- $\alpha_t(s_t, a_t)$：学习率（控制更新步长）； 
+- $\gamma$：折扣因子（权衡即时与未来奖励）； - 仅更新当前访问的 $(s_t, a_t)$，其余状态-动作对的 Q 值保持不变。
+
+行为策略（生成经验样本的策略）与目标策略（用于更新动作值的策略）分离：
+
+- 行为策略：通常是 *ϵ*- 贪婪策略（保证探索，生成多样样本）；
+- 目标策略：始终是**贪婪策略**（基于当前动作值选择最优动作，即 $π(s)=argmax_a q_t(s,a)）$。
+
+- 区别只在 “经验来源”：On-Policy 是 “自己试出来的经验，自己用”；Off-Policy 是 “别人（或探索策略）试出来的经验，自己用”—— 后者更灵活，样本效率更高（不用重复踩别人已经踩过的坑）。对于LLM,Off-Policy收敛更快,On-Policy上限更高
+
+可以用以下 Markdown 格式呈现这段 TD 算法的核心公式与表格（包含 LaTeX 公式排版）： 
+
+所有时序差分（TD）算法的动作值更新可统一表示为： $$ q_{t+1}(s_t, a_t) = q_t(s_t, a_t) - \alpha_t(s_t, a_t)\left[ q_t(s_t, a_t) - \bar{q}_t \right] $$ 
+其中，$\bar{q}_t$ 被称为 **TD 目标（TD target）**——不同 TD 算法的核心差异，正是 $\bar{q}_t$ 的定义不同。 
+
+| Algorithm      | Expression of $\bar{q}_t$                                    |
+| -------------- | ------------------------------------------------------------ |
+| Sarsa          | $\bar{q}_t=r_{t+1}+\gamma q_t(s_{t+1},a_{t+1})$              |
+| *n*-step Sarsa | $\bar{q}_t=r_{t+1}+\gamma r_{t+2}+\cdots+\gamma^nq_t(s_{t+n},a_{t+n})$ |
+| Expected Sarsa | $\bar{q}*t = r*{t+1} + \gamma \sum_a \pi_t(as_{t+1}) q_t(s_{t+1}, a)$ |
+| Q-learning     | $\bar{q}_t=r_{t+1}+\gamma\max_aq_t(s_{t+1},a)$               |
+| Monte Carlo    | $\bar{q}_t=r_{t+1}+\gamma r_{t+2}+\ldots $                   |
+
+
 
 
 
@@ -255,7 +317,7 @@ $$Q(s_t,a_t) \leftarrow Q(s_t,a_t) + \alpha [r_t + \gamma r_{t + 1} + \cdots + \
 #### **以采样策略和更新策略划分**
 
 * **On-Policy**：用来采样的**行为策略 Behavior Policy和用这些数据更新的目标策略 Target Policy是同一个策略，**&#x4F8B;如SARSA，更新的时候需要使用到当前行为策略采样得到的五元组数&#x636E;**&#x20;**$$(s,a,r,s',a')$$
-* **Off-Policy：**&#x7528;来采样的**行为策略 Behavior Policy和用这些数据更新的目标策略 Target Policy不是同一个一个策略，**&#x4F8B;如Q-learning，更新使用当前行为策略采样的四元组 $$(s,a,r,s')$$ ，$$a'$$是通过 $$\max (Q)$$得到的，而不是行为策略采样得到的
+* **Off-Policy：**&#x7528;来采样的**行为策略 Behavior Policy和用这些数据更新的目标策略 Target Policy不是同一个一个策略，**&#x4F8B;如Q-learning，更新使用当前行为策略采样的四元组 $$(s,a,r,s')$$ ，$$a'$$是通过 $$\max (Q)$$得到的，而**不是行为策略采样得到**的
 
 ## **动态规划方法**
 
@@ -283,3 +345,12 @@ $$Q(s_t,a_t) \leftarrow Q(s_t,a_t) + \alpha [r_t + \gamma r_{t + 1} + \cdots + \
 **On-Policy与Off-Policy对比示意图**
 
 ### 
+
+
+
+
+
+
+
+
+
