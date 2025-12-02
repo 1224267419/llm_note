@@ -557,6 +557,8 @@ $\delta_k \leq \frac{\left| \overbrace{\nabla_{w} f(w_k, x_k)}^{\text{stochastic
 
 ### 7.1. TD learning of state values
 
+估计给定策略的state value
+
 $w = \mathbb{E}\left[ R + \gamma v(X) \right],$其中$R,X$是随机变量,$\gamma$是确定值,$v(x)$是值函数,E()里面的部分即我们之前提出的值函数内容
 
 $g(w)$估计		$$ \begin{aligned} g(w) &= w - \mathbb{E}\left[ R + \gamma v(X) \right], \\ \tilde{g}(w, \eta) &= w - \left[ r + \gamma v(x) \right] \\ &= \left( w - \mathbb{E}\left[ R + \gamma v(X) \right] \right) + \left( \mathbb{E}\left[ R + \gamma v(X) \right] - \left[ r + \gamma v(x) \right] \right) \\ &\doteq g(w) + \eta. \end{aligned} $$
@@ -605,11 +607,19 @@ $$\begin{aligned}
 
 ### 7.2 Sarsa
 
-[TODO](https://www.bilibili.com/video/BV1sd4y167NS?spm_id_from=333.788.player.switch&vd_source=82d188e70a66018d5a366d01b4858dc1&p=32)
+目标:**给定策略,估计action value**
+
+
+
+
+
+
 
 ### 7.3  n-step Sarsa
 
 ### 7.4 Q-learning
+
+直接求解optimal action value从而找到最优路径
 
 ### 7.5 summery
 
