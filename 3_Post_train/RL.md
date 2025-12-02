@@ -485,9 +485,133 @@ $$
 
 
 
+MC Epsilon-Greedy:通过**牺牲最优性换来了探索性**,通常可以使得$\epsilon$**逐渐减少**来平衡最优性和探索性0
 
 
 
+## 6.Stochastic Approximation随机近似理论
+
+ $\mathbb{E}[X] \approx \bar{x} \doteq \frac{1}{n} \sum_{i=1}^{n} x_i.$
+
+通过n个$x$来预测$E(X)$,但上述式子需要在所有x都输出后才求出
+而incremental增量式的方法可以避免这个问题
+
+$w_{k+1} = \frac{1}{k} \sum_{i=1}^{k} x_i = \frac{1}{k} \left( \sum_{i=1}^{k-1} x_i + x_k \right) = \\\frac{1}{k} \left( (k-1)w_k + x_k \right) = w_k - \frac{1}{k}(w_k - x_k).$
+
+如此增量式的迭代法,可以逐次计算E(x),不必等待所有值计算完成,而这个$w_k$虽然不精确,但可以不准确的作为$E(X)$使用,下面是更一般化的形式
+
+$w_{k+1} = w_k - \alpha_k (w_k - x_k).$,满足一定条件时,$\alpha_k$≠$\frac{1}{k}$也可以令$w_{k+1}$->$E(X)$
+
+
+
+### 6.2 Robbins-Monro algorithm罗宾斯-罗门算法
+
+目的:在**不知道目标函数或其导数的表达式**的前提下,通过随机迭代,解决**求根或者优化**问题,
+
+example: 求$g(w)=0$,由于存在噪声,含噪观测值:$\tilde{g}(w, \eta) = g(w) + \eta$
+**迭代**:$w_{k+1} = w_k - a_k \tilde{g}(w_k, \eta_k),$不断迭代从而落在最优点(局部最优也是最优)
+
+![image-20251129104648689](./RL.assets/image-20251129104648689.png)
+
+如图所示,不断迭代优化直至收敛
+
+
+
+### 6.3 SGD
+
+#### 6.3.1 GD
+
+梯度下降GD$w_{k+1} = w_k - \alpha_k \nabla_{w} J(w_k) = w_k - \alpha_k \mathbb{E}\left[ \nabla_{w} f(w_k, X) \right]$,将$\nabla$移至E中,从而不用求期望后再梯度下降,直接求梯度后再平均
+
+#### 6.3.2 BGD
+
+$\mathbb{E}\left[ \nabla_{w} f(w_k, X) \right] \approx \frac{1}{n} \sum_{i=1}^{n} \nabla_{w} f(w_k, x_i). \\w_{k+1} = w_k - \frac{\alpha_k}{n} \sum_{i=1}^{n} \nabla_{w} f(w_k, x_i).$
+
+根据MC思想,用**随机观测值估计期望**,所以有了BGD
+
+#### 6.3.3 SGD
+
+$w_{k+1} = w_k - \alpha_k \nabla_{w} f(w_k, x_k),$使用$x_k$计算梯度,SGD的梯度和GD的误差如下
+
+$\nabla_{w} f(w_k, x_k) = \mathbb{E}\left[ \nabla_{w} f(w_k, X) \right] + \left( \nabla_{w} f(w_k, x_k) - \mathbb{E}\left[ \nabla_{w} f(w_k, X) \right] \right)
+\doteq \mathbb{E}\left[ \nabla_{w} f(w_k, X) \right] + \eta_k,$
+重写SGD算法为 $w_{k+1} = w_k - \alpha_k \mathbb{E}\left[ \nabla_{w} f(w_k, X) \right] - \alpha_k \eta_k,$
+累计误差的期望$\mathbb{E}[\eta_k] = \mathbb{E}\left[ \nabla_{w} f(w_k, x_k) - \mathbb{E}\left[ \nabla_{w} f(w_k, X) \right] \right] = \mathbb{E}_{x_k}\left[ \nabla_{w} f(w_k, x_k) \right] - \mathbb{E}_X\left[ \nabla_{w} f(w_k, X) \right] = 0.$
+误差均值为0,因此可以说不会影响收敛性(这里并非严格证明)
+
+收敛速度:
+
+相对误差:$\delta_k \doteq \frac{\left\| \nabla_{w} f(w_k, x_k) - \mathbb{E}\left[ \nabla_{w} f(w_k, X) \right] \right\|}{\left\| \mathbb{E}\left[ \nabla_{w} f(w_k, X) \right] \right\|}.$
+
+在最优点$w^*$处,$\mathbb{E}\left[ \nabla_{w} f(w^*, X) \right] = 0$梯度的期望应当为0
+
+$\delta_k = \frac{\left| \nabla_{w} f(w_k, x_k) - \mathbb{E}\left[ \nabla_{w} f(w_k, X) \right] \right|}{\left| \mathbb{E}\left[ \nabla_{w} f(w_k, X) \right] - \mathbb{E}\left[ \nabla_{w} f(w^*, X) \right] \right|} = \frac{\left| \nabla_{w} f(w_k, x_k) - \mathbb{E}\left[ \nabla_{w} f(w_k, X) \right] \right|}{\left| \mathbb{E}\left[ \nabla_w^2 f(\tilde{w}_k, X) (w_k - w^*) \right] \right|}, \tag{6.15}$中值定理化约出$(w_k-w^*)$
+
+$\delta_k \leq \frac{\left| \overbrace{\nabla_{w} f(w_k, x_k)}^{\text{stochastic gradient}} - \overbrace{\mathbb{E}\left[ \nabla_{w} f(w_k, X) \right]}^{\text{true gradient}} \right|}{c \underbrace{|w_k - w^*|}_{\text{与最优解的距离}}}.$ $w_k$和$w_*$在距离很远的时候误差较小,在距离近的时候误差较大
+
+
+
+## 7.Temporal-Difference learning时序差分算法
+
+
+
+### 7.1. TD learning of state values
+
+$w = \mathbb{E}\left[ R + \gamma v(X) \right],$其中$R,X$是随机变量,$\gamma$是确定值,$v(x)$是值函数,E()里面的部分即我们之前提出的值函数内容
+
+$g(w)$估计		$$ \begin{aligned} g(w) &= w - \mathbb{E}\left[ R + \gamma v(X) \right], \\ \tilde{g}(w, \eta) &= w - \left[ r + \gamma v(x) \right] \\ &= \left( w - \mathbb{E}\left[ R + \gamma v(X) \right] \right) + \left( \mathbb{E}\left[ R + \gamma v(X) \right] - \left[ r + \gamma v(x) \right] \right) \\ &\doteq g(w) + \eta. \end{aligned} $$
+
+$$ w_{k+1} = w_k - \alpha_k \tilde{g}(w_k, \eta_k) = w_k - \alpha_k \left[ w_k - \left( r_k + \gamma v(x_k) \right) \right] $$更新w得到这个形式,后部分为噪声
+
+#### 定义
+
+已知策略$\pi$生成了这样一组策略: ($s_0, r_1, s_1, . . . , s_t, r_{t+1}, s_{t+1}, . . .$ ) ,TD算法定义如下
+
+$$ \begin{aligned} v_{t+1}(s_t) &= v_t(s_t) - \alpha_t(s_t) \left[ v_t(s_t) - \left[ r_{t+1} + \gamma v_t(s_{t+1}) \right] \right], \\ v_{t+1}(s) &= v_t(s), \quad \forall s \neq s_t, \end{aligned} $$
+
+第一个式子是要修改的$v(s)$,**第二个式子是没被访问的部分,一般会隐含掉**
+
+$$ \underbrace{v_{t+1}(s_t)}_{\text{new estimate}} = \underbrace{v_t(s_t)}_{\text{current estimate}} - \alpha_t(s_t) \left[ \underbrace{v_t(s_t) - \left[ \underbrace{r_{t+1} + \gamma v_t(s_{t+1})}_{\text{TD target } \bar{v}_t} \right]}_{\text{TD error } \delta_t} \right], $$
+
+更新公式各项的具体含义如上:
+使得 $v(s_t)$趋近于$$\bar{v}_t$$,为什么这么说
+
+TD target  $$\bar{v}_t$$
+$$ \begin{aligned} v_{t+1}(s_t) &= v_t(s_t) - \alpha_t(s_t) \left[ v_t(s_t) - \bar{v}_t \right] \\ \implies \quad v_{t+1}(s_t) - \bar{v}_t &= v_t(s_t) - \bar{v}_t - \alpha_t(s_t) \left[ v_t(s_t) - \bar{v}_t \right] \\ \implies \quad v_{t+1}(s_t) - \bar{v}_t &= \left[ 1 - \alpha_t(s_t) \right] \left[ v_t(s_t) - \bar{v}_t \right] \\ \implies \quad \left| v_{t+1}(s_t) - \bar{v}_t \right| &= \left| 1 - \alpha_t(s_t) \right| \left| v_t(s_t) - \bar{v}_t \right| \end{aligned} $$
+而且$0<1 - \alpha_t(s_t)<1$,因此有$|v_{t+1}(s_t) - \bar{v}_t| ≤ |v_t(s_t) - \bar{v}_t|$,即$v_{t+1}(s_t)$离$ \bar{v}_t$比$v_{t}(s_t)$的距离更近
+
+TD error  $\delta_t$ 衡量了$v_t$和$v_{\pi}$之间的误差
+$$
+\delta_t = v(s_t) - \left[ r_{t+1} + \gamma v(s_{t+1}) \right]
+$$
+令$v=v_\pi$​,有
+$$\begin{aligned}
+\mathbb{E}\left[ \delta_t \mid S_t = s_t \right] &= \mathbb{E}\left[ v_\pi(S_t) - \left( R_{t+1} + \gamma v_\pi(S_{t+1}) \right) \mid S_t = s_t \right] \\
+&= v_\pi(s_t) - \mathbb{E}\left[ R_{t+1} + \gamma v_\pi(S_{t+1}) \mid S_t = s_t \right] \\
+&= 0. 
+\end{aligned}$$
+即对于目标$v_\pi$,TD error的期望为0,不为0则$v_\pi$和$v_t$不一致,因此可以用来优化
+
+| TD 学习                                                      | MC 学习                                                      |
+| ------------------------------------------------------------ | ------------------------------------------------------------ |
+| **增量性**：TD 学习是增量式的，收到经验样本后可立即更新状态 / 动作值。 | **非增量性**：MC 学习是非增量式的，必须等整个episode完全结束后，计算完该情节的折扣回报才能更新。 |
+| **任务类型**：因是增量式，TD 可同时处理 “情节式任务” 和 “持续任务”（**持续任务可能没有终止状态,或者持续很长时间**）。 | **任务类型**：因是非增量式，MC 只能处理 “情节式任务”（这类任务的情节会**在有限步骤后终止**）(从后往前计算)。 |
+| **自举性**：TD 学习是 “自举” 的 —— 状态 / 动作值的更新依赖**之前的估计值**，因此需要先对值做初始猜测。**自举的初始值会带来bias** | **非自举性**：MC 学习不具备自举性，可直接估计状态 / 动作值，**无需依赖初始猜测,因此expection是无偏估计** |
+| **估计方差低**：TD 的估计方差低于 MC，因为它涉及的**随机变量更少**。例如 Sarsa（TD 的一种）仅需要 3 个随机变量：$R_{t+1},S_{t+1},A_{t+1}$。 | **估计方差高**：MC 的估计方差更高，因为涉及大量随机变量。例如估计$q_\pi$需要$R_{t+1} + \gamma R_{t+2} + \gamma^2 R_{t+3} + \dots$；若情节长度为*L*，仅一个状态的动作就有$|A∣^L$种可能，仅用**少量情节估计时，方差会很高**。 |
+
+
+
+
+
+### 7.2 Sarsa
+
+[TODO](https://www.bilibili.com/video/BV1sd4y167NS?spm_id_from=333.788.player.switch&vd_source=82d188e70a66018d5a366d01b4858dc1&p=32)
+
+### 7.3  n-step Sarsa
+
+### 7.4 Q-learning
+
+### 7.5 summery
 
 
 
