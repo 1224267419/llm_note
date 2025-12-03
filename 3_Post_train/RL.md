@@ -356,7 +356,7 @@ https://www.bilibili.com/video/BV1sd4y167NS?vd_source=82d188e70a66018d5a366d01b4
 Step 1: policy evaluation (PE) 
 This step is to calculate the state value of $ \pi_k $  ($v_{\pi k}$): 
 	$$v_{\pi_k} = r_{\pi_k} + \gamma P_{\pi_k} v_{\pi_k}$$ 
-Note that \( v_{\pi_k} \) is a state value function.  _
+Note that  v_{\pi_k}  is a state value function.  _
 
 Step 2: policy improvement (PI) ,
 	$$\pi_{k+1} = \arg\max_{\pi} \left(r_\pi + \gamma P_\pi v_{\pi_k}\right)$$  
@@ -649,12 +649,107 @@ $\hat{v}(s, w) = \phi^T(s)w$ 中的$\phi^T(s)$可以通过**多项式**,也可�
 
 $\hat{v}(s,w) = \phi^T(s)w = \begin{bmatrix} 1, x, y \end{bmatrix} \begin{bmatrix} w_1 \\ w_2 \\ w_3 \end{bmatrix} = w_1 + w_2 x + w_3 y.$(平面拟合图片
 
-![1764757830755](RL.assets/1764757830755.png)
+<img src="RL.assets/1764757830755.png" alt="1764757830755" style="zoom:50%;" />
 
 
 
-$\phi(s) = \left[1, x, y, x^2, y^2, xy\right]^T \in \mathbb{R}^6.$二次曲面拟合![1764757873049](RL.assets/1764757873049.png)
+$\phi(s) = \left[1, x, y, x^2, y^2, xy\right]^T \in \mathbb{R}^6.$用更多的参数,二次曲面拟合<img src="RL.assets/1764757873049.png" alt="1764757873049" style="zoom:50%;" />
 显然loss更低
+
+#### 8.3.1 Sarsa with Value Function Approximateion
+
+$w_{t+1} = w_t + \alpha_t \left[ r_{t+1} + \gamma \hat{q}(s_{t+1}, a_{t+1}, w_t) - \hat{q}(s_t, a_t, w_t) \right] \nabla_w \hat{q}(s_t, a_t, w_t).$ 带 Value Function Approximateion的Sarsa
+
+Aim: Search a policy that can lead the agent to the target from an initial state-action pair (s_0, a_0). 
+
+1. Take action $a_t $ following$ \pi_t(s_t)$, generate r_{t+1}, s_{t+1}, and then take action a_{t+1} following \pi_t(s_{t+1}) 
+2. **Value update (parameter update):** $$ w_{t+1} = w_t + \alpha_t \left[ r_{t+1} + \gamma \hat{q}(s_{t+1}, a_{t+1}, w_t) - \hat{q}(s_t, a_t, w_t) \right] \nabla_w \hat{q}(s_t, a_t, w_t) $$ 
+   [ ] 部分其实就是Sarsa的TD Target
+3. Policy update:** $$ \pi_{t+1}(a|s_t) = \begin{cases} 1 - \frac{\varepsilon}{|\mathcal{A}(s)|} \left( |\mathcal{A}(s)| - 1 \right) & \text{if } a = \arg\max_{a \in \mathcal{A}(s_t)} \hat{q}(s_t, a, w_{t+1}) \\ \frac{\varepsilon}{|\mathcal{A}(s)|} & \text{otherwise} \end{cases} $$  
+
+唯一的不同在于Value update部分我们更新的是parameter $w$而非action value函数$q$
+
+ 
+
+#### 8.3.2 Q-learning with Value Function Approximateion
+
+The q-value update rule is
+ $$ w_{t+1} = w_t + \alpha_t \left[ r_{t+1} + \gamma \max_{a \in \mathcal{A}(s_{t+1})} \hat{q}(s_{t+1}, a, w_t) - \hat{q}(s_t, a_t, w_t) \right] \nabla_w \hat{q}(s_t, a_t, w_t), $$ 
+which is the same as Sarsa except that  $ \hat{q}(s_{t+1}, a_{t+1}, w_t)$  is replaced by    $ \max_{a \in \mathcal{A}(s_{t+1})} \hat{q}(s_{t+1}, a, w_t)$.  
+
+### 8.4 Deep Q-learning(DQN deep  Q-network)
+
+需要优化的loss:  $$ J(w) = \mathbb{E}\left[ \left( R + \gamma \max_{a \in \mathcal{A}(S')} \hat{q}(S', a, w) - \hat{q}(S, A, w) \right)^2 \right], $$  $()^2$里面就是TD target,如果达到最优,贝尔曼最优方程的$q(s,a)=R + \gamma \max_{a \in \mathcal{A}(S')} =\hat{q}(S', a, w)$,因此用其作为loss function
+
+将上述loss区分成两个network,**main network** $\hat{q}(s,a,w)$和 **target network**  $\hat{q}(s,a,w_T$),主网络用于实时预测Q值并更新参数，目标网络用于生成稳定的目标Q值（避免训练波动）, 需要优化的参数分别为$w$和$w_T$ ;
+
+  $$ J = \mathbb{E}\left[ \left( R + \gamma \max_{a \in \mathcal{A}(S')} \hat{q}(S', a, w_T) - \hat{q}(S, A, w) \right)^2 \right] $$  
+
+在深度 Q-Learning（DQN）的双网络架构中，核心是为了让训练更稳定(类似GAN的两个网络不断博弈的过程)：
+
+- **主网络（Main Network）**
+  - 功能 1：实时预测 Q 值 $\hat q(s',a,w)$，为智能体的动作选择提供依据（比如通过argmax选最优动作）。
+  - 功能 2：作为 “待优化的网络”，根据损失函数的梯度**持续更新参数 w**，不断学习更准确的 Q 值。
+- **目标网络（Target Network）**
+  - 功能 1：生成**稳定的目标 Q 值**$\hat q(s',a,w_T)$（用于计算损失函数中的 “目标项”）。
+  - 功能 2：参数$ w_T$ 不会实时更新，而是**定期从主网络同步**（比如每 N 轮训练复制一次主网络的参数），避免目标 Q 值随主网络波动而导致**训练震荡**。
+
+由于动作选择和目标值计算使用同一网络，取max这个操作容易导致Q值的过高估计，而使用两个网络也是因为一个网络难以收敛。
+
+#### 8.4.2DQN 中 Experience Replay
+
+智能体与环境交互产生的经验$（s,a,r,s′）$是**时序连续**的（相邻时刻的状态、动作高度关联）。若直接用连续样本训练，会导致梯度更新存在 “时序偏差”—— 模型可能过度拟合时序噪声，而非学习到通用规律。经验回放通过**随机采样**经验池中的样本，让训练数据近似满足 “独立同分布” 假设，消除时序相关性带来的梯度震荡，让 Q 值学习更平稳。
+
+智能体训练过程中，**策略会不断更新，导致交互经验的分布**（状态、动作分布）**持续变化**（即 “分布偏移”）。经验池存储了不同阶段的经验，**随机采样相当于 “混合不同分布的样本”**，降低了分布偏移对模型更新的冲击，让模型更鲁棒。
+
+
+
+这张图片围绕“表格型Q-Learning”与“深度Q-Learning（DQN）”的核心差异，解答了两者在**经验回放需求、样本分布依赖**上的区别，以下是详细解释：
+
+
+### 整体背景
+这部分内容是“回顾表格型Q-Learning”，对比它与深度Q-Learning在训练逻辑上的不同，核心围绕“经验回放”和“样本分布”两个关键点展开。
+
+为什么表格型Q-Learning不需要经验回放？
+
+- 回答：**No uniform distribution requirement（没有均匀分布的要求）**
+- 解释：
+  表格型Q-Learning的核心是用“Q表”存储**每个（状态s，动作a）对应的Q值**——它的更新逻辑是“针对单个$（s,a）$的Q值单独调整”：
+  当智能体交互得到经验$(s,a,r,s')$时，直接用这个经验更新Q表中“Q(s,a)”这一个单元格的值（遵循贝尔曼方程：$Q(s,a) \leftarrow Q(s,a) + \alpha[r + \gamma \max_a Q(s',a) - Q(s,a)]$）。
+
+  由于每个（s,a）的Q值是**独立维护**的，不需要通过“批量样本的平均”来优化，因此无需要求样本满足“独立同分布”（经验回放的核心作用之一是稳定样本分布），自然不需要经验回放。
+
+为什么深度Q-Learning涉及分布？
+
+- 回答：
+  深度Q-Learning的目标函数是**所有(S,A)样本上的标量平均**；而表格型Q-Learning不涉及S或A的任何分布，它的目标是求解所有(s,a)对应的方程（贝尔曼最优方程）。
+- 解释：
+  深度Q-Learning是用**神经网络近似Q函数**$(\hat{q}(s,a,w))$，其训练目标是“最小化所有样本的均方误差损失”（即损失是**所有(S,A)样本的标量平均**，对应之前的$J(w) = \mathbb{E}[(目标Q值 - 当前Q值)^2]$。
+
+  神经网络的优化依赖“批量样本的梯度下降”，样本的**分布会直接影响网络的拟合效果**（比如** **），因此深度Q-Learning必须考虑样本的分布（这也是经验回放存在的原因之一）。
+
+  而表格型Q-Learning不涉及分布：它的目标是“逐个修正每个$(s,a)$的Q值”，不需要对“所有$(s,a)$的样本”做平均，因此**不依赖样本的分布**。
+
+3. 问题3：能否在表格型Q-Learning中使用经验回放？
+
+- 回答：可以，且样本效率更高（后续会解释原因）
+- 解释：
+  表格型Q-Learning“不需要”经验回放，但“可以用”：经验回放的核心是存储交互产生的(s,a,r,s')样本并**重复利用**。
+
+  表格型Q-Learning使用经验回放后，无需每次都通过与环境交互获取新样本（可以复用经验池中的旧样本），从而减少与环境的交互次数，提升“样本利用效率”。
+
+
+总结来说，这部分内容的核心是：**表格型与深度Q-Learning的更新逻辑差异（“逐个Q值修正”vs“神经网络批量拟合”），导致了两者对经验回放、样本分布的需求不同**。
+
+
+
+## 9.Policy Gradient Methods策略梯度方法
+
+https://www.bilibili.com/video/BV1sd4y167NS?spm_id_from=333.788.videopod.episodes&vd_source=82d188e70a66018d5a366d01b4858dc1&p=45
+
+
+
+
 
 
 
