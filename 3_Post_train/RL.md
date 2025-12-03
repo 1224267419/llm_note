@@ -603,29 +603,58 @@ $$\begin{aligned}
 
 
 
-
-
-### 7.2 Sarsa
-
-目标:**给定策略,估计action value**
+[剩余部分见](note2RL.md)
 
 
 
+## 8 Value Function Approximateion
+
+之前我们提到的**状态都是离散且有限的表格**,但实际情况下更多是**无限连续的状态**,强行离散化这些连续的状态会导致网格很大,处理不理想;存储也是一大难题;过多的(s,a)对你不能完全访问到,因而会导致泛化能力能力差
+
+$\hat{v}(s, w) = as + b = \underbrace{[s,\ 1]}_{\phi^T(s)} \underbrace{\begin{bmatrix} a \\ b \end{bmatrix}}_{w} = \phi^T(s)w$,这个就是一阶近似,而提供**更高阶的**$w,\phi^T(s)$即可拟合更高阶的曲线,w是参数,而$\phi^T(s)$是函数的自变量 ; 这个函数对于w来说是线性的,因此便于求梯度下降(访问状态s时修正w函数(梯度下降))
 
 
 
+### 8.2值估计算法
 
-### 7.3  n-step Sarsa
+optimal $w$使得 $\hat v(s,w)$ approximate $v_\pi(s)$
 
-### 7.4 Q-learning
+#### 8.2.1 uniform distribution平均分布
 
-直接求解optimal action value从而找到最优路径
+假设各个值函数的重要程度相同,因此$J(w) = \mathbb{E}\left[(v_\pi(S) - \hat{v}(S, w))^2\right] = \frac{1}{|\mathcal{S}|} \sum_{s \in \mathcal{S}} \left(v_\pi(s) - \hat{v}(s, w)\right)^2$
 
-### 7.5 summery
+但实际上各个点的重要性是不一样的,比如**目标值附近的的点应该更常被访问,因此重要性更高**
+
+#### 8.2.2 stationary distribution稳态分布
+
+在马尔可夫过程（比如强化学习中的状态转移过程）中，**稳态分布是一种 “长期稳定的概率分布”**：如果系统的状态分布达到平稳分布，那么后续任意时刻的状态分布都不会再变化。
+
+$d_\pi(s) \geq 0 \quad\quad \sum_{s \in \mathcal{S}} d_\pi(s) = 1.  $
+
+此时loss function为$J(w) = \mathbb{E}\left[(v_\pi(S) - \hat{v}(S, w))^2\right] = \sum_{s \in \mathcal{S}} d_\pi(s) \left(v_\pi(s) - \hat{v}(s, w)\right)^2$
+
+通过控制各个状态的权重,使得函数更准确(权重大的点误差更小)
+
+![1764745521876](RL.assets/1764745521876.png)
+
+例如,通过这样一个例子来理解:经过大量episode以后,$d_\pi(s)$趋于稳定,因此有$d_\pi^T=d_\pi^TP_\pi$, $P_\pi$为转移矩阵
 
 
 
+$\hat{v}(s, w) = \phi^T(s)w$ 中的$\phi^T(s)$可以通过**多项式**,也可以通过**神经网络**来模拟,然后再通过gd进一步优化
 
+
+
+#### example
+
+$\hat{v}(s,w) = \phi^T(s)w = \begin{bmatrix} 1, x, y \end{bmatrix} \begin{bmatrix} w_1 \\ w_2 \\ w_3 \end{bmatrix} = w_1 + w_2 x + w_3 y.$(平面拟合图片
+
+![1764757830755](RL.assets/1764757830755.png)
+
+
+
+$\phi(s) = \left[1, x, y, x^2, y^2, xy\right]^T \in \mathbb{R}^6.$二次曲面拟合![1764757873049](RL.assets/1764757873049.png)
+显然loss更低
 
 
 
