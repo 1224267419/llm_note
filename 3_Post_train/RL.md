@@ -745,7 +745,157 @@ which is the same as Sarsa except that  $ \hat{q}(s_{t+1}, a_{t+1}, w_t)$  is re
 
 ## 9.Policy Gradient Methods策略梯度方法
 
-https://www.bilibili.com/video/BV1sd4y167NS?spm_id_from=333.788.videopod.episodes&vd_source=82d188e70a66018d5a366d01b4858dc1&p=45
+### 9.1 Basic idea of policy gradient
+
+在实际运动中,机器人的运动a是连续的(非离散,离散化的难题上面有),因此我们使用  Policy-base的方法更好
+
+
+
+可以用 Markdown + LaTeX 排版这段内容： The function representation is also sometimes written as $\pi(a,s,\theta), \pi_\theta(a|s)$, or $\pi_\theta(a,s)$.  这是强化学习中**策略函数**的不同表示形式，用于描述“在状态 $s$ 下选择动作 $a$ 的策略”，其中 $\theta$ 是策略的参数。
+
+
+
+### 9.2 Metrics to define optimal policies
+
+9.2.1average state value
+
+ $$\bar{v}_\pi = \sum_{s \in \mathcal{S}} d(s) v_\pi(s)$$  
+这个公式表示**策略$\pi$下的“状态价值函数的期望”**： 加权平均
+
+- $\bar{v}_\pi$：策略\pi$对应的“平均状态价值”； _
+- $d(s)$：状态$s$在策略$\pi$下的**稳态分布**（即长期交互中状态$s$出现的概率）；
+- $v_\pi(s)$：状态$s$在策略$\pi$下的“状态价值”（从$s$出发的期望累积奖励）。  
+
+
+
+向量形式:
+
+$$\bar{v}_\pi = \sum_{s \in \mathcal{S}} d(s) v_\pi(s) = d^T v_\pi$$ 其中：
+
+- $v_\pi = \left[ \dots, v_\pi(s), \dots \right]^T \in \mathbb{R}^{|\mathcal{S}|}$（状态价值的向量形式，每个元素对应一个状态 $s$ 的价值 $v_\pi(s)$）； 
+- $d = \left[ \dots, d(s), \dots \right]^T \in \mathbb{R}^{|\mathcal{S}|}$（状态稳态分布的向量形式，每个元素对应状态 $s$ 的出现概率 $d(s)$。  
+
+
+
+### 9.3 Gradients of the metrics
+
+
+
+### 9.4 Gradient-ascent algorithm (REINFORCE)
+
+
+
+
+
+## 10.Actor-Critic method
+
+actor:**policy update**
+Critic:**policy evalution** or **value estimation**
+
+
+
+10.1 Q Actor-critic(QAC
+
+1) A scalar metric $$J(\theta) $$, which can be $$\bar{v}_\pi $$ or $$\bar{r}_\pi $$.
+
+2) The gradient-ascent algorithm maximizing $$J(\theta) $$ is
+$
+\begin{align*}
+\theta_{t+1} &= \theta_t + \alpha \nabla_\theta J(\theta_t) \\
+&= \theta_t + \alpha \mathbb{E}_{S \sim \eta, A \sim \pi} \left[ \nabla_\theta \ln \pi(A|S, \theta_t) q_\pi(S, A) \right]
+\end{align*}
+$
+
+3. The stochastic gradient-ascent algorithm is (从期望变成随机梯度下降,更新$\theta$即更新策略,因此下式子是actor)
+$$
+  \theta_{t+1} = \theta_t + \alpha \nabla_\theta \ln \pi(a_t|s_t, \theta_t) q_t(s_t, a_t)
+$$
+  而critic则是用于估计$q_t$的,因为$q_t$是对$q_\pi$的近似
+
+![image-20251204205202244](./RL.assets/image-20251204205202244.png)
+
+
+
+2 Advantage actor-critic (A2C)
+
+■ Baseline invariance: $ \begin{align*} \nabla_\theta J(\theta) &= \mathbb{E}_{S \sim \eta, A \sim \pi} \left[ \nabla_\theta \ln \pi(A|S, \theta_t) q_\pi(S, A) \right] \\ &= \mathbb{E}_{S \sim \eta, A \sim \pi} \left[ \nabla_\theta \ln \pi(A|S, \theta_t) \big( q_\pi(S, A) - b(S) \big) \right] \end{align*} $对于引入b(S)这样子的一个标量函数,都是相同的
+
+为什么引入b不会发生变化,即$ \mathbb{E}_{S \sim \eta, A \sim \pi} [\nabla_\theta \ln \pi(A|S, \theta_t) * b(S)] = \sum_{s \in \mathcal{S}} \eta(s) \sum_{a \in \mathcal{A}} \nabla_\theta \pi(a|s, \theta_t) b(s)=\sum_{s \in \mathcal{S}} \eta(s)b(s) \sum_{a \in \mathcal{A}} \nabla_\theta \pi(a|s, \theta_t) =0 $
+
+而$\sum\pi(a|s, \theta_t)=1$,对常数求梯度自然为0,因此成立(要求b(S)与a无关,仅与S相关,因此可以提到前面
+
+对应的Markdown公式如下： $$ \nabla_\theta J(\theta) = \mathbb{E}[X] \quad \text{where} $$  $X(S, A) \doteq \nabla_\theta \ln \pi(A|S, \theta_t) \big[ q(S, A) - b(S) \big] $ 简化一下公式
+
+但var(X)和b(S)相关,即**b(S)的取法会影响X的方差**,因此我们**希望方差能达到最小,从而在取样时有更小的误差**
+
+$ b^*(s) = \frac{\mathbb{E}_{A \sim \pi}\left[ \left\| \nabla_\theta \ln \pi(A|s, \theta_t) \right\|^2 q(s, A) \right]}{\mathbb{E}_{A \sim \pi}\left[ \left\| \nabla_\theta \ln \pi(A|s, \theta_t) \right\|^2 \right]} $而且b也有最佳的取值,如左公式,但是左公式的求解还是太复杂了,更常用的$b(s) = \mathbb{E}_{A \sim \pi}\left[ q(s, A) \right] = v_\pi(s)$虽然不是最优,但是计算更简单
+
+
+
+
+
+
+
+对应的Markdown公式如下：
+
+$
+\begin{align*}
+\theta_{t+1} &= \theta_t + \alpha \mathbb{E}\left[ \nabla_\theta \ln \pi(A|S, \theta_t) \big( q_\pi(S, A) - v_\pi(S) \big) \right] \\
+&\doteq \theta_t + \alpha \mathbb{E}\left[ \nabla_\theta \ln \pi(A|S, \theta_t) \delta_\pi(S, A) \right]
+\end{align*}
+$
+
+其中定义：
+$
+\delta_\pi(S, A) \doteq q_\pi(S, A) - v_\pi(S)
+$
+
+
+### 公式解读
+**符号含义**
+
+- $ \theta_{t+1}/\theta_t $：更新后/当前的策略参数
+
+- $ \alpha $：学习率
+
+- $ \nabla_\theta \ln \pi(A|S, \theta_t) $：策略的对数梯度（用于调整策略参数的方向）
+
+- $ q_\pi(S,A) $：动作值函数，$ v_\pi(S) $：状态值函数
+
+- $ \delta_\pi(S,A) $：**优势函数**（动作相对于状态基准的额外收益）
+
+  
+
+通过“优势函数”替代原始动作值函数，既保留了策略梯度的无偏性，又能大幅降低梯度估计的方差，提升算法训练的稳定性与效率。
+
+$ \begin{align*} \theta_{t+1} &= \theta_t + \alpha \nabla_\theta \ln \pi(a_t|s_t, \theta_t) \delta_t(s_t, a_t) \\ &= \theta_t + \alpha \frac{\nabla_\theta \pi(a_t|s_t, \theta_t)}{\pi(a_t|s_t, \theta_t)} \delta_t(s_t, a_t) \\ &= \theta_t + \alpha \underbrace{\left( \frac{\delta_t(s_t, a_t)}{\pi(a_t|s_t, \theta_t)} \right)}_{\text{step size}} \nabla_\theta \pi(a_t|s_t, \theta_t) \end{align*} $
+
+$ \delta_t = q_t(s_t, a_t) - v_t(s_t) \rightarrow r_{t+1} + \gamma v_t(s_{t+1}) - v_t(s_t) $ 
+
+使用时序差分（TD）误差（同时也是优势函数的单步近似）   
+展示了**优势函数的TD误差近似**：将动作值函数$ q_t(s_t,a_t) $用“即时奖励+折扣后下一状态值”（即TD目标）替代，从而得到可通过单步采样计算的TD误差$ \delta_t $。这种近似是演员-评论家算法中高效计算优势的常用方式，既简化了计算，也能有效反映当前动作相对于状态基准的“优势”。
+
+算法流程如下
+
+![image-20251204222317567](./RL.assets/image-20251204222317567.png)
+
+■ The algorithm of advantage actor-critic
+
+3 Off-policy actor-critic
+
+■ Illustrative examples
+
+■ Importance sampling
+
+■ The theorem of off-policy policy gradient
+
+■ The algorithm of off-policy actor-critic
+
+4 Deterministic actor-critic (DPG)
+
+■ The theorem of deterministic policy gradient
+
+■ The algorithm of deterministic actor-critic
 
 
 
