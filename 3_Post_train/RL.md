@@ -834,9 +834,7 @@ $ b^*(s) = \frac{\mathbb{E}_{A \sim \pi}\left[ \left\| \nabla_\theta \ln \pi(A|s
 
 
 
-
-
-对应的Markdown公式如下：
+$\theta$更新:
 
 $
 \begin{align*}
@@ -850,21 +848,17 @@ $
 \delta_\pi(S, A) \doteq q_\pi(S, A) - v_\pi(S)
 $
 
+公式解读
 
-### 公式解读
 **符号含义**
 
 - $ \theta_{t+1}/\theta_t $：更新后/当前的策略参数
-
 - $ \alpha $：学习率
-
 - $ \nabla_\theta \ln \pi(A|S, \theta_t) $：策略的对数梯度（用于调整策略参数的方向）
-
 - $ q_\pi(S,A) $：动作值函数，$ v_\pi(S) $：状态值函数
-
 - $ \delta_\pi(S,A) $：**优势函数**（动作相对于状态基准的额外收益）
 
-  
+■ The algorithm of advantage actor-critic
 
 通过“优势函数”替代原始动作值函数，既保留了策略梯度的无偏性，又能大幅降低梯度估计的方差，提升算法训练的稳定性与效率。
 
@@ -879,15 +873,48 @@ $ \delta_t = q_t(s_t, a_t) - v_t(s_t) \rightarrow r_{t+1} + \gamma v_t(s_{t+1}) 
 
 ![image-20251204222317567](./RL.assets/image-20251204222317567.png)
 
-■ The algorithm of advantage actor-critic
-
 3 Off-policy actor-critic
 
-■ Illustrative examples
+■ examples
 
-■ Importance sampling
+#### ■ **Importance sampling**
+
+重要性采样（Importance Sampling, IS）是**蒙特卡洛（Monte Carlo, MC）方法的核心扩展技术**，核心目标是通过「改变采样分布」来高效估计目标分布的期望 —— 当目标分布难以直接采样（或采样效率极低）时，利用**易于采样的「提议分布」生成样本**，再**通过「重要性权重」修正偏差**，最终得到无偏（或渐近无偏）的期望估计。
+
+是**解决「采样效率低」「分布不匹配」问题的关键工具**（如强化学习的 Policy Gradient、离线强化学习、变分推断等场景）。以下从**核心原理、数学推导、关键概念、AI 领域应用、可复现示例、优缺点与注意事项**展开，完全贴合学术研究与项目开发需求。
+
+
+要估计**目标分布 $p_0(x)$** 下随机变量 $X$ 的期望 $\mathbb{E}_{X \sim p_0}[X]$，当 $p_0(x)$ 难以直接采样时，可借助**提议分布 $p_1(x)$**（易于采样），通过**重要性权重**修正偏差：
+
+$$
+\mathbb{E}_{X \sim p_0}\left[ X \right] = \sum_{x} p_0(x) \cdot x = \sum_{x} p_1(x) \cdot \underbrace{\frac{p_0(x)}{p_1(x)}}_{f(x)} \cdot x = \mathbb{E}_{X \sim p_1}\left[ \underbrace{f(X) \cdot X}_{修正后的随机变量} \right]
+$$
+
+符号说明：
+
+- $p_0(x)$：**目标分布**（需估计期望，但采样困难）；
+- $p_1(x)$：**提议分布**（**易于采样**，且满足 $p_1(x) > 0$ 当 $p_0(x) > 0$）；
+- $f(x) = \frac{p_0(x)}{p_1(x)}$：**重要性权重**（修正提议分布与目标分布的偏差）；
+- 将目标分布的期望，转化为提议分布下“权重×随机变量”的期望，实现高效估计。
+
+ 
+
+- 若 $p_1(x)$ 过于接近 $p_0(x)$，可能采样成本变高（失去重要性采样的意义）；
+- 若 $p_1(x)$ 过于简单（如均匀分布），则权重方差会变大。
+
+既然已知$p_0(x)$,为什么我们不能之间求期望,原因:
+
+1. 「解析积分 / 求和无闭合解」(如p(x)表达式是一个神经网络,完全无法求解,只能用MC法近似)
+2. x 是**高维变量**
+3. 离散分布的规模过大：无法遍历求和
+
+
 
 ■ The theorem of off-policy policy gradient
+
+
+
+
 
 ■ The algorithm of off-policy actor-critic
 
