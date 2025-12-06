@@ -679,7 +679,7 @@ which is the same as Sarsa except that  $ \hat{q}(s_{t+1}, a_{t+1}, w_t)$  is re
 
 ### 8.4 Deep Q-learning(DQN deep  Q-network)
 
-需要优化的loss:  $$ J(w) = \mathbb{E}\left[ \left( R + \gamma \max_{a \in \mathcal{A}(S')} \hat{q}(S', a, w) - \hat{q}(S, A, w) \right)^2 \right], $$  $()^2$里面就是TD target,如果达到最优,贝尔曼最优方程的$q(s,a)=R + \gamma \max_{a \in \mathcal{A}(S')} =\hat{q}(S', a, w)$,因此用其作为loss function
+需要优化的loss:  $$ J(w) = \mathbb{E}\left[ \left( R + \gamma \max_{a \in \mathcal{A}(S')} \hat{q}(S', a, w) - \hat{q}(S, A, w) \right)^2 \right], $$  $()^2$里面就是TD target,如果达到最优,贝尔曼最优方程的$q(s,a)=R + \gamma \max_{a \in \mathcal{A}(S')} \hat{q}(S', a, w)$,因此用其作为loss function
 
 将上述loss区分成两个network,**main network** $\hat{q}(s,a,w)$和 **target network**  $\hat{q}(s,a,w_T$),主网络用于实时预测Q值并更新参数，目标网络用于生成稳定的目标Q值（避免训练波动）, 需要优化的参数分别为$w$和$w_T$ ;
 
@@ -704,7 +704,7 @@ which is the same as Sarsa except that  $ \hat{q}(s_{t+1}, a_{t+1}, w_t)$  is re
 
 
 
-这张图片围绕“表格型Q-Learning”与“深度Q-Learning（DQN）”的核心差异，解答了两者在**经验回放需求、样本分布依赖**上的区别，以下是详细解释：
+
 
 
 ### 整体背景
