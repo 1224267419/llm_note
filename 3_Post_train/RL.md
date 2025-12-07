@@ -197,26 +197,8 @@ $$
 
 ### 2.5 Bellman equation : Solve the state values
 
-通过state values,我们才能评价一个策略到底是好还是不好
-
-对应的Markdown格式（含LaTeX公式）如下：
-
-```markdown
-- The closed-form solution is:
-  $$v_\pi = (I - \gamma P_\pi)^{-1} r_\pi$$
-
-  In practice, we still need to use numerical tools to calculate the matrix inverse.
-  Can we avoid the matrix inverse operation? Yes, by iterative algorithms.
 
 
-- An **iterative solution** is:
-  $$v_{k+1} = r_\pi + \gamma P_\pi v_k$$
-
-  This algorithm leads to a sequence $\{v_0, v_1, v_2, \dots\}$. We can show that
-  $$v_k \to v_\pi = (I - \gamma P_\pi)^{-1} r_\pi, \quad k \to \infty$$
-```
-
-渲染后效果：
 - The closed-form solution is:闭式解
   $$v_\pi = (I - \gamma P_\pi)^{-1} r_\pi$$
 
