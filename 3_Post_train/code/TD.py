@@ -160,7 +160,7 @@ def run_sarsa():
     epsilon = 0.1
     alpha = 0.1
     gamma = 0.9
-    agent = Sarsa1(ncol, nrow, epsilon, alpha, gamma)
+    agent = Sarsa(ncol, nrow, epsilon, alpha, gamma)
     num_episodes = 500  # 智能体在环境中运行的序列的数量
     env = CliffWalkingEnv(ncol, nrow)
 

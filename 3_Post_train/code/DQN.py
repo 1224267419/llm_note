@@ -133,15 +133,13 @@ class DoubleDQN(DQN):
         q_values = self.q_net(states).gather(1, actions)
 
         # ================== Double DQN 的核心修改点 ==================
-
+        # 选动作和打分来自两个不同网络
         # 步骤 A: 使用【当前网络 (q_net)】计算下一状态的最佳动作索引
         # .max(1)[1] 返回的是索引 (argmax action)，而不是数值
         max_action = self.q_net(next_states).max(1)[1].view(-1, 1)
         # 步骤 B: 使用【目标网络 (target_q_net)】计算该动作对应的 Q 值
         # .gather(1, max_action) 根据上面选出的动作索引提取 Q 值
         max_next_q_values = self.target_q_net(next_states).gather(1, max_action)
-
-
 
         q_targets = rewards + self.gamma * max_next_q_values * (1 - dones)
         # 均方差,用mean处理一个batch
