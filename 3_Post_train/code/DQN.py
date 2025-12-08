@@ -103,6 +103,7 @@ class DQN:
         # action告诉我们我们采取哪个动作,self.q_net输出策略在对应位置的Q 值
         # .gather(1, actions) 我们采取的那个动作对应的 Q 值
         q_values = self.q_net(states).gather(1, actions)
+
         # Q-learning 用target_net算出下一步状态 next_states 的所有 Q 值，取最大
         max_next_q_values = self.target_q_net(next_states).max(1)[0].view(-1, 1)
         # Target = Reward + Gamma * Max(Next_Q) * (1 - Done),
