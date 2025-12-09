@@ -540,19 +540,33 @@ $$
 
 ## 7.策略梯度算法
 
-# TODO
+### 7.1 policy-base
 
-https://huggingface.co/learn/deep-rl-course/en/unit4/introduction
+policy-base的方法相较于value-base的方法,优点如下:
 
-https://hrl.boyuai.com/chapter/2/%E7%AD%96%E7%95%A5%E6%A2%AF%E5%BA%A6%E7%AE%97%E6%B3%95
+1. 可以直接估计策略，而无需存储额外的数据（动作值）
+2. 可以学习**随机策略**
+3. 可以解决**感知混叠**问题。感知混叠指的是**两种状态看似（或实际）相同，但需要执行不同动作**的情况
+
+感知混叠:![Hamster 1](note2RL.assets/hamster2.jpg)
+
+如上图,对于两个红色状态,如果使用值函数value,二者的值函数应该是一致的,**确定性的动作导致可能永远无法到达灰尘位置**
+
+![Hamster 1](note2RL.assets/hamster3.jpg)
+
+而使用随机策略则不容易卡住
 
 
 
-上述的q-learning等value的方法有个问题:策略是确定的(**不能学习到随机策略**,但事实上这种**确定策略不一定是最优的,或者是最优的其中一种情况**)
+value-base输出是离散动作的q值,policy-base输出的是**动作的概率分布**
 
-基于值函数的方法主要是学习值函数，然后根据值函数导出一个策略，学习过程中并不存在一个显式的策略；而**基于策略的方法则是直接显式地学习一个目标策略**
+缺点:
 
+- **策略梯度方法通常收敛到局部最优解而不是全局最优解。**
+- 策略梯度逐步进行，速度较慢：训练时间可能更长（效率低下）。
+- 策略梯度可能具有高方差。
 
+### 7.2 公式推导
 
 对策略参数化并用神经网络建模，输入状态，输出动作的概率分布，**策略学习的目标函数定义为当前策略在初始状态价值函数的期望**：
 
@@ -575,14 +589,109 @@ $$
 
 
 
-这个式子是**策略梯度的核心公式**，用来计算目标函数 \( J(\theta) \) 关于策略参数 \( \theta \) 的梯度，常见于强化学习的策略梯度方法中~
-
+这个式子是**策略梯度的核心公式**，用来计算目标函数 $ J(\theta)$  关于策略参数  $\theta$  的梯度，常见于强化学习的策略梯度方法中下面是策略$\theta$的更新公式
 
 $$ \nabla_\theta J(\theta) = \sum_\tau P(\tau; \theta) \nabla_\theta \log P(\tau; \theta) R(\tau)  = \mathbb{E}_{\tau \sim P(\tau;\theta)} \left[ \nabla_\theta \log P(\tau; \theta) R(\tau) \right] $$
 
+$$\theta_{k+1}=\theta_k+ \alpha \nabla_\theta J(\pi_\theta)|_{\theta_k}$$
+
+假设有策略$P(\tau \mid \theta) = \rho_0(s_0) \prod_{i=0}^{T-1} P(s_{i+1} \mid s_i, a_i) \pi_\theta(a_i \mid s_i)$
+$\pi_{\theta}(a_i|s_i)$是在$s_i$时选择$a_i$的概率,取对数求梯度有
+$\nabla_\theta \log P(\tau \mid \theta) = \sum_{i=0}^{T} \nabla_\theta \log \pi_\theta(a_i \mid s_i)$,在代回上述期望,有
+
+$$\nabla_\theta J(\pi_\theta) = \mathbb{E}_{\tau \sim \pi_\theta} \left[ \sum_{i=0}^{T} \nabla_\theta \log \pi_\theta(a_i \mid s_i) \cdot R(\tau) \right]$$
+
+跟据公式,每一步决策($log \pi_\theta$)决定了全局表现, 实际操作则有MC抽样近似期望E
+梯度估计  $\nabla_\theta J(\pi_\theta)  \approx\hat{g} =  \frac{1}{|\mathcal{D}|} \sum_{\tau \in \mathcal{D}} \sum_{t=0}^{T} \underbrace{\nabla_\theta \log \pi_\theta(a_t \mid s_t)}_{\text{每步棋的决策梯度}} \cdot \underbrace{R(\tau)}_{\text{一次运行总奖励}}$ 
+
+策略优化:$$\theta_{k+1}=\theta_k+ \alpha \hat g$$
+
+- **关键优势：**model-free。
+- **计算要求：**需要大量的采样以降低随机性带来的波动（方差）。
+- **改进方向：**后续方法（如 Actor-Critic）会引入**价值函数参考线**，使得**策略更新更为稳定**，就像在复盘中加入专业教练的点评一样，帮助你更快提高棋艺。
+
+策略梯度算法中的梯度估计虽然在**理论上是无偏**的（即其期望值会收敛到真实梯度），但**实际上它的方差非常高**(如果没有大量采样)
+
+### 7.3 方差减少
+
+上述方法指出,在当前评估指标下,使用更多的方法降低方差
+
+#### 7.3.1 只关注未来
+
+梯度估计式 $\hat{g} = \frac{1}{|\mathcal{D}|} \sum_{\tau \in \mathcal{D}} \sum_{t=0}^{T} \nabla_\theta \log \pi_\theta(a_t \mid s_t) \cdot R(\tau)$：
+
+这里的 $R(\tau)$ 是**整条轨迹的总奖励**，会把轨迹中**所有时间步的奖励**都算进去。但实际逻辑不合理：
+当前时间步 $t$ 的决策（动作 $a_t$），**只应该影响 $t$ 之后的奖励**（未来的结果）；**而 $t$ 之前的奖励是“过去的决策”导致的，和当前 $a_t$ 无关**，不该被纳入当前决策的梯度计算。只考虑从当前动作开始到比赛结束所获得的奖励。
+修正后的梯度估计式 :
+
+ $\nabla_\theta J(\theta) \approx \frac{1}{N} \sum_{i=1}^{N} \left( \sum_{t=0}^{T} \nabla_\theta \log \pi_\theta(a_{i,t} \mid s_{i,t}) \right) \left( \sum_{t'=t}^{T} r(s_{i,t'}, a_{i,t'}) \right)$
+
+去掉了过去的决策估计,噪声自然降低
+
+
+
+#### 7.3.2 **Baseline**
+
+为每一步的“后续奖励”减去一个baseline
+
+$\nabla_\theta J(\theta) \approx \frac{1}{N} \sum_{i=1}^{N} \left( \sum_{t=0}^{T} \nabla_\theta \log \pi_\theta(a_{i,t} \mid s_{i,t}) \right) \left( \sum_{t'=t}^{T} r(s_{i,t'}, a_{i,t'}) - b \right)$
+
+其中$\mathbb{E}\left[ \nabla_\theta \log \pi_\theta(a \mid s) \cdot b \right] = 0$ , 因此期望E不变,而方差Var(x)=$E(X^2)-(E(X))^2$,加上baseline后第二项不变,第一项$\mathbb{E}\left[ \left( \nabla_\theta \log \pi \cdot (R - b) \right)^2 \right] = \mathbb{E}\left[ \left( \nabla_\theta \log \pi \cdot R \right)^2 \right] - 2b \cdot \mathbb{E}\left[ \left( \nabla_\theta \log \pi \right)^2 \cdot R \right] + b^2 \cdot \mathbb{E}\left[ \left( \nabla_\theta \log \pi \right)^2 \right]$,当$b=E[R|s]$时var最小,使得能够降低方差,提高计算的稳定性
+
+这个b不一定是常数,可以用函数等进行拟合,通过**优势项**降低方差
+
+#### 7.3.3 优势函数Q,V
+
+
+
+定义动作优势$A(s,a) = Q(s,a) - V(s)$ , 在同一个状态下，所有动作的优势值A之和为 0，因为所有动作的动作价值的期望就是这个状态的状态价值,因此,Q _net被建模为
+$$
+Q_{\pi,\theta}(s,a) = V_{\pi,\theta}(s) + A_{\pi,\theta}(s,a)
+$$
+Q:执行a后的value
+V:当前s的value
+A:执行a后value增加/减少了多少
+
+优化策略梯度有
+
+$\nabla_\theta J(\theta) \approx \frac{1}{N} \sum_{i=1}^{N} \left( \sum_{t=0}^{T} \nabla_\theta \log \pi_\theta(a_{i,t} \mid s_{i,t}) \right) A^\pi(s,a)$
+
+
+
+#### 7.3.5 GAE**广义优势估计**
+
+优势项估计:$\begin{aligned}
+\hat{A}^\pi(s_t, a_t) &= \left[ r(s_t, a_t) + \gamma V^\pi(s_{t+1}) \right] - V^\pi(s_t) \\
+\hat{A}^\pi(s_t, a_t) &= \left[ r(s_t, a_t) + \gamma r(s_{t+1}, a_{t+1}) + \gamma^2 V^\pi(s_{t+2}) \right] - V^\pi(s_t) \\
+\hat{A}^\pi(s_t, a_t) &= \left[ r(s_t, a_t) + \gamma r(s_{t+1}, a_{t+1}) + \gamma^2 r(s_{t+2}, a_{t+2}) + \gamma^3 V^\pi(s_{t+3}) \right] - V^\pi(s_t)
+\end{aligned}$
+
+- **如果我们过早地停止累加真实的奖励项：**就会产生**高偏差（high bias）**，因为只使用了对价值函数的小部分近似和极少的真实奖励。
+- **如果我们累加过多的奖励项：**则会引入**高方差（high variance）**，因为依赖更多真实采样会让估计量不稳定。
+
+通过结合MC和TD的优势,兼顾近期和长期,使得结果更加可靠
+
+# TODO
+
+### [**2.10 PPO 损失函数（The PPO Loss）**]([大语言模型RLHF全链路揭秘：从策略梯度、PPO、GAE到DPO的实战指南](https://mp.weixin.qq.com/s/S72LO26IsZ8AED8sQKIWnQ))
+
+
+
+#### 7.3.4 summary
+
+总之，通过这些方法——只考虑“后续奖励”、引入参考线以及使用优势函数，我们就能在训练中有效降低梯度估计的方差，就像你在下棋时只关注关键走法对局面转变的影响，从而让策略更新更稳定、更有针对性。
+
+
+
+
+
 [【PPO、GRPO的理论基础】【策略梯度】value-based强化学习算法 策略梯度定理的完整数学推导 reinforce算法_哔哩哔哩_bilibili](https://www.bilibili.com/video/BV14Tx2zsEHo?spm_id_from=333.788.player.switch&vd_source=82d188e70a66018d5a366d01b4858dc1&trackid=web_related_0.router-related-2206146-cnt78.1765156339743.597)
 
-强化学习候补部分
 
 
+
+
+
+
+PPO近端策略优化
 
