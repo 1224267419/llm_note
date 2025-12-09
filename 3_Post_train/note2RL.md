@@ -671,7 +671,9 @@ $\nabla_\theta J(\theta) \approx \frac{1}{N} \sum_{i=1}^{N} \left( \sum_{t=0}^{T
 
 通过结合MC和TD的优势,兼顾近期和长期,使得结果更加可靠
 
-# TODO
+# PPO
+
+https://www.bilibili.com/video/BV1qrbrzqEwL/?spm_id_from=333.337.search-card.all.click&vd_source=82d188e70a66018d5a366d01b4858dc1
 
 ### [**2.10 PPO 损失函数（The PPO Loss）**]([大语言模型RLHF全链路揭秘：从策略梯度、PPO、GAE到DPO的实战指南](https://mp.weixin.qq.com/s/S72LO26IsZ8AED8sQKIWnQ))
 
