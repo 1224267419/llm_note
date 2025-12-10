@@ -540,7 +540,7 @@ $$
 
 ## 7.策略梯度算法
 
-### 7.1 policy-base
+### 7.1 policy-base [REINFORCE算法](code\Policy Gradient.py) 
 
 policy-base的方法相较于value-base的方法,优点如下:
 
@@ -671,19 +671,150 @@ $\nabla_\theta J(\theta) \approx \frac{1}{N} \sum_{i=1}^{N} \left( \sum_{t=0}^{T
 
 通过结合MC和TD的优势,兼顾近期和长期,使得结果更加可靠
 
+### 7.4 [Actor-Critic算法](code\Actor_Critic.py) 
+
+类似GAN,一个actor一个Critic互相更新进步 , 既学习价值函数，又学习策略函数
+
+
+
+在策略梯度算法中,
+
+梯度公式如下：
+$$g = \mathbb{E}\left[ \sum_{t=0}^{T} \psi_t \nabla_\theta \log \pi(a_t|s_t) \right]$$
+
+
+其中，$\psi_t$的常见形式包括：
+1. $\sum_{t'=0}^{T} \gamma^{t'} r_{t'}$：轨迹的总回报；
+2. $\sum_{t'=t}^{T} \gamma^{t'-t} r_{t'}$：动作$a_t$之后的回报；
+3. $\sum_{t'=t}^{T} \gamma^{t'-t} r_{t'} - b(s_t)$：基线版本的改进；
+4. $Q^\pi(s_t, a_t)$：动作价值函数；
+5. $A^\pi(s_t, a_t)$：优势函数；
+6. $r_t + \gamma V^\pi(s_{t+1}) - V^\pi(s_t)$：时序差分残差。
+
+
+其中形式2对应REINFORCE，形式5对应PPO,而`优势函数和baseline版本在上述以及讲过
+
+Critic 价值网络的loss,使用上述的 6 : **时序差分残差** 作为学习方式,有
+$\mathcal{L}(\omega) = \frac{1}{2} \underbrace{\left( r + \gamma V_{\hat{\omega}}(s_{t+1}) \right)}_{\text{时序差分目标}} - \underbrace{V_{\omega}(s_t)}_{\text{当前价值网络的预测值}} )^2$
+
+类比DQN,将$r + \gamma V_\omega(s_{t+1})$部分 , $\hat{\omega}$是**目标价值网络**的参数，与当前网络参数$\omega$分离,避免震荡
+所以有价值函数的梯度为：$\nabla_\omega \mathcal{L}(\omega) = \left( r + \gamma V_\omega(s_{t+1}) - V_\omega(s_t) \right) \cdot \nabla_\omega \underbrace{\left( r + \gamma V_\omega(s_{t+1}) - V_\omega(s_t) \right)}_{\text{对\omega求导的部分}}=\\ -\left( r + \gamma V_\omega(s_{t+1}) - V_\omega(s_t) \right) \nabla_\omega V_\omega(s_t)$
+
+- Actor 优化目标：让 “优势高” 的动作概率更大（用 TD 误差近似优势）；
+- Critic 优化目标：让价值预测接近 “时序差分目标”（真实价值的近似）。
+
+### 7.5 TRPO
+
+#### 7.5.1定义
+
+策略梯度算法主要沿着 $\nabla_\theta J(\theta)$ 方向迭代更新策略参数 $\theta$。但是这种算法有一个明显的缺点：当策略网络是深度模型时，沿着策略梯度更新参数，**很有可能由于步长太长，策略突然显著变差，进而影响训练效果**。
+
+考虑在更新时找到一块**信任区域**（trust region），在这个区域上更新策略时能够得到某种策略性能的安全性保证，这就是**信任区域策略优化**（trust region policy optimization，TRPO）, 它在理论上能够保证策略学习的性能单调性
+
+使用重要性采样:$J(\theta') - J(\theta) \approx \mathbb{E}\left[ \frac{\pi_{\theta'}(a \mid s)}{\pi_\theta(a \mid s)} A^{\pi_\theta}(s,a) \right]$
+
+通过这样一个近似,最大化这个优势A,新策略就会更好,但**新旧策略必须很像**（$\pi_{\theta'} \approx \pi_{\theta}$）。如果**步长太大**，策略变动剧烈，状态分布 $\nu(s)$ 会发生剧变，之前的数学推导就全崩了，导致性能断崖式下跌（Policy Collapse）。
+
+**目标函数** (Objective)：最大化替代回报 (Surrogate Objective)
+
+$$\max_\theta \mathbb{E}_{s \sim \rho_{\theta_{\text{old}}}, a \sim \pi_{\theta_{\text{old}}}} \left[ \frac{\pi_\theta(a \mid s)}{\pi_{\theta_{\text{old}}}(a \mid s)} A_{\theta_{\text{old}}}(s,a) \right]$$
+
+**约束条件** (Constraint)：新旧策略的 KL 散度（区别）不能超过 $\delta$
+
+$$\text{subject to } \mathbb{E}_s\left[ D_{KL}\left( \pi_{\theta_{\text{old}}}(\cdot \mid s) \parallel \pi_\theta(\cdot \mid s) \right) \right] \leq \delta$$
+
+#### 7.5.2近似求解
+
+这是一个复杂的**非线性约束优化**问题，计算机很难直接算。TRPO 使用了**泰勒展开**来近似：
+
+1. 对目标函数做一阶展开（线性近似）：
+
+   
+
+   $$L(\theta) \approx L(\theta_{old}) + g^T (\theta - \theta_{old})$$
+
+   
+
+   其中 $g$ 是梯度的方向。
+
+2. 对约束条件做二阶展开（二次近似）：
+
+   因为 KL 散度在 $\theta = \theta_{old}$ 处是最小值 0，所以一阶导是 0。我们看二阶导：
+
+   
+
+   $$D_{KL} \approx \frac{1}{2} (\theta - \theta_{old})^T H (\theta - \theta_{old})$$
+
+   
+
+   这里的 $H$ 是 KL 散度的 Hessian 矩阵（也就是 Fisher Information Matrix, FIM）。它描述了参数空间的“曲率”。
+
+最终的近似问题变成：
+
+
+
+$$\max_{\Delta \theta} g^T \Delta \theta \quad \text{s.t.} \quad \frac{1}{2} \Delta \theta^T H \Delta \theta \le \delta$$
+
+这就像是在一个椭圆区域（由 $H$ 定义）里找梯度上升最快的方向。
+
+
+
+$$\Delta \theta = \sqrt{\frac{2\delta}{g^T H^{-1} g}} H^{-1} g$$
+
+**自然梯度 (Natural Gradient)** 更新方向。
+
+但是上述式子有个问题,H矩阵参数量很大,导致求逆十分困难
+
+#### 7.5.3**共轭梯度法 (Conjugate Gradient, CG)**：
+
+我们不需要真的求 $H^{-1}$。我们只需要计算 $x = H^{-1}g$。这等价于求解线性方程组 $Hx = g$。
+CG 算法可以在**不构造矩阵 H** 的情况下，通过计算“H 乘以 向量”的积（Hessian-Vector Product），快速迭代出 $x$ 的近似解。
+
+#### 7.5.4线性搜索 (Line Search)：
+
+由于我们用了**泰勒展开近似**，算出来的步长可能不准，导致
+
+1. KL 散度还是超标了
+2. 没有让目标函数变大。
+
+所以 TRPO 会进行回溯（**Backtracking**）：如果算出步长是 $\beta$，先试一试；不行就缩减成 $0.5\beta$，再不行 $0.25\beta$... 直到满足约束且回报提升。
+
+对于A的估计,请看7.3.5GAE部分,这里不再赘述
+
 # PPO
+
+![img](note2RL.assets/kjhM-Ait4LifbmrKLSKKb.jpg)
 
 https://www.bilibili.com/video/BV1qrbrzqEwL/?spm_id_from=333.337.search-card.all.click&vd_source=82d188e70a66018d5a366d01b4858dc1
 
-### [**2.10 PPO 损失函数（The PPO Loss）**]([大语言模型RLHF全链路揭秘：从策略梯度、PPO、GAE到DPO的实战指南](https://mp.weixin.qq.com/s/S72LO26IsZ8AED8sQKIWnQ))
+### [**2.10 PPO**](https://mp.weixin.qq.com/s/S72LO26IsZ8AED8sQKIWnQ)
+
+ [代码](code\PPO.py) 对比TRPO,PPO做了以下改进
 
 
 
-#### 7.3.4 summary
+1. PPO使用 **一阶优化方法**, TRPO的共轭梯度法近似需要用到二阶梯度,计算十分困难
+2. TRPO 通过复杂的数学推导来保证 KL 散度不超标，而 PPO 直接修改了目标函数，通过 **“截断” (Clipping)** 来惩罚过大的更新。
+3. 借助重要性采样,将TRPO的on-policy转换为off-policy,由于有了 Clip 机制的保护，即使新策略和旧策略有了一定差异，Loss 也不会爆炸。因此，PPO 允许我们拿同一批采样数据，进行 **多轮 (Multi-Epoch) 更新**（通常是 3-10 个 Epoch）
 
-总之，通过这些方法——只考虑“后续奖励”、引入参考线以及使用优势函数，我们就能在训练中有效降低梯度估计的方差，就像你在下棋时只关注关键走法对局面转变的影响，从而让策略更新更稳定、更有针对性。
 
 
+PPO 的目标是限制新策略与旧策略之间的差异，以保证训练的稳定性, 有两种方式
+
+#### (1) PPO-惩罚 (PPO-Penalty)
+
+- **方法**：利用拉格朗日乘数法，直接将 KL 散度（衡量两个分布差异的指标）**作为惩罚项加入到目标函数中，使其变成一个无约束优化问题**。
+- **动态调整**：算法会根据 KL 散度的大小动态调整惩罚系数 $\beta$：
+  - 如果 KL 散度过小（差异太小），减小 $\beta$ 以鼓励更大的更新。
+  - 如果 KL 散度过大（差异太大），增大 $\beta$ 以限制更新幅度。
+
+#### (2) PPO-截断 (PPO-Clip)
+
+- **方法**：这是**更常用且效果通常更好的形式**。它**直接在目标函数中对策略比率（Ratio）进行截断**。
+- **机制**：
+  - 计算新旧策略的比率 $r_t(\theta)$。
+  - 将该比率限制在 $[1-\epsilon, 1+\epsilon]$ 的范围内（$\epsilon$ 是超参数，例如 0.2）。
+  - 最终**目标函数取“未截断”和“截断后”两者的最小值**，从而悲观地估计策略收益，**防止策略更新步长过大**导致性能崩塌。
 
 
 
