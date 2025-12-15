@@ -86,7 +86,7 @@ def compute_advantage(gamma, lmbda, td_delta):
     advantage_list = []
     advantage = 0.0
     for delta in td_delta[::-1]:
-        advantage = gamma * lmbda * advantage + delta
+        advantage = gamma * lmbda * advantage + delta #A_t = δ_t + γλ A_{t+1}
         advantage_list.append(advantage)
     advantage_list.reverse()
     return torch.tensor(advantage_list, dtype=torch.float)

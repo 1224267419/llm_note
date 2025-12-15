@@ -661,12 +661,26 @@ $\nabla_\theta J(\theta) \approx \frac{1}{N} \sum_{i=1}^{N} \left( \sum_{t=0}^{T
 #### 7.3.5 GAE**广义优势估计**
 
 优势项估计:$\begin{aligned}
-\hat{A}^\pi(s_t, a_t) &= \left[ r(s_t, a_t) + \gamma V^\pi(s_{t+1}) \right] - V^\pi(s_t) \\
-\hat{A}^\pi(s_t, a_t) &= \left[ r(s_t, a_t) + \gamma r(s_{t+1}, a_{t+1}) + \gamma^2 V^\pi(s_{t+2}) \right] - V^\pi(s_t) \\
-\hat{A}^\pi(s_t, a_t) &= \left[ r(s_t, a_t) + \gamma r(s_{t+1}, a_{t+1}) + \gamma^2 r(s_{t+2}, a_{t+2}) + \gamma^3 V^\pi(s_{t+3}) \right] - V^\pi(s_t)
+\hat{A}^{(1)}_\pi(s_t, a_t) &= \left[ r(s_t, a_t) + \gamma V^\pi(s_{t+1}) \right] - V^\pi(s_t) \\
+\hat{A}^{(2)}_\pi(s_t, a_t) &= \left[ r(s_t, a_t) + \gamma r(s_{t+1}, a_{t+1}) + \gamma^2 V^\pi(s_{t+2}) \right] - V^\pi(s_t) \\
+\hat{A}^{(3)}_\pi(s_t, a_t) &= \left[ r(s_t, a_t) + \gamma r(s_{t+1}, a_{t+1}) + \gamma^2 r(s_{t+2}, a_{t+2}) + \gamma^3 V^\pi(s_{t+3}) \right] - V^\pi(s_t)\\
 \end{aligned}$
 
-- **如果我们过早地停止累加真实的奖励项：**就会产生**高偏差（high bias）**，因为只使用了对价值函数的小部分近似和极少的真实奖励。
+$A_t^{(k)} = \sum_{l=0}^{k-1} \gamma^l \delta_{t+l} \quad \delta_t = r_t + \gamma V^\pi(s_{t+1}) - V^\pi(s_t)$
+
+GAE:不要固定某个 k ，而是对所有 k-step Advantage 取一个几何加权平均：
+
+$\hat{A}_t^{\text{GAE}(\gamma,\lambda)} = (1-\lambda)\sum_{l=0}^{\infty} (\lambda)^{k-1} A^{(k)}_t$
+
+$$\begin{aligned}
+A_t^{\text{GAE}} &= (1-\lambda)\left(A_t^{(1)} + \lambda A_t^{(2)} + \lambda^2 A_t^{(3)} + \dots \right) \\
+&= (1-\lambda)\left( \delta_t + \lambda\left(\delta_t + \gamma\delta_{t+1}\right) + \lambda^2\left(\delta_t + \gamma\delta_{t+1} + \gamma^2\delta_{t+2}\right) + \dots \right) \\
+&= (1-\lambda)\left( \delta_t(1+\lambda+\lambda^2+\dots) + \gamma\delta_{t+1}(\lambda+\lambda^2+\lambda^3+\dots) + \gamma^2\delta_{t+2}(\lambda^2+\lambda^3+\lambda^4+\dots) + \dots \right) \\
+&= (1-\lambda)\left( \frac{\delta_t}{1-\lambda} + \frac{\gamma\delta_{t+1}\lambda}{1-\lambda} + \frac{\gamma^2\delta_{t+2}\lambda^2}{1-\lambda} + \dots \right) \\
+&= \sum_{l=0}^{\infty} (\gamma\lambda)^l \delta_{t+l}
+\end{aligned}$$
+
+- 如果我们过早地停止累加真实的奖励项：**就会产生**高偏差（high bias）**，因为只使用了对价值函数的小部分近似和极少的真实奖励。
 - **如果我们累加过多的奖励项：**则会引入**高方差（high variance）**，因为依赖更多真实采样会让估计量不稳定。
 
 通过结合MC和TD的优势,兼顾近期和长期,使得结果更加可靠
