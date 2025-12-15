@@ -816,6 +816,8 @@ https://www.bilibili.com/video/BV1qrbrzqEwL/?spm_id_from=333.337.search-card.all
 PPO 的目标是限制新策略与旧策略之间的差异，以保证训练的稳定性, 有两种方式
 
 #### (1) PPO-惩罚 (PPO-Penalty)
+[image-20251210220337890](./note2RL.assets/image-20251210220337890.png)
+
 
 - **方法**：利用拉格朗日乘数法，直接将 KL 散度（衡量两个分布差异的指标）**作为惩罚项加入到目标函数中，使其变成一个无约束优化问题**。
 - **动态调整**：算法会根据 KL 散度的大小动态调整惩罚系数 $\beta$：
@@ -831,14 +833,57 @@ PPO 的目标是限制新策略与旧策略之间的差异，以保证训练的�
   - 最终**目标函数取“未截断”和“截断后”两者的最小值**，从而悲观地估计策略收益，**防止策略更新步长过大**导致性能崩塌。
 
 
+定义动作优势$A(s,a) = Q(s,a) - V(s)$ , 在同一个状态下，所有动作的优势值A之和为 0，因为所有动作的动作价值的期望就是这个状态的状态价值,因此,Q _net被建模为
+$$
+Q_{\pi,\theta}(s,a) = V_{\pi,\theta}(s) + A_{\pi,\theta}(s,a)
+$$
+Q:执行a后的value
+V:当前s的value
+A:执行a后value增加/减少了多少
 
-[【PPO、GRPO的理论基础】【策略梯度】value-based强化学习算法 策略梯度定理的完整数学推导 reinforce算法_哔哩哔哩_bilibili](https://www.bilibili.com/video/BV14Tx2zsEHo?spm_id_from=333.788.player.switch&vd_source=82d188e70a66018d5a366d01b4858dc1&trackid=web_related_0.router-related-2206146-cnt78.1765156339743.597)
+优化策略梯度有
 
+$\nabla_\theta J(\theta) \approx \frac{1}{N} \sum_{i=1}^{N} \left( \sum_{t=0}^{T} \nabla_\theta \log \pi_\theta(a_{i,t} \mid s_{i,t}) \right) A^\pi(s,a)$
 
+$Q_\theta(s_t, a) = r_t + \gamma \cdot V_\theta(s_{t+1})$ 
+$A_\theta(s_t, a) = r_t + \gamma \cdot V_\theta(s_{t+1}) - V_\theta(s_t)$
 
+#### 7.3.5 GAE**广义优势估计**
 
+优势项估计:
+$$A_\theta^1(s_t, a) = r_t + \gamma * V_\theta(s_{t+1}) - V_\theta(s_t)$$
+ $$A_\theta^2(s_t, a) = r_t + \gamma * r_{t+1} + \gamma^2 * V_\theta(s_{t+2}) - V_\theta(s_t)$$ 
+$$A_\theta^3(s_t, a) = r_t + \gamma * r_{t+1} + \gamma^2 * r_{t+2} + \gamma^3 V_\theta(s_{t+3}) - V_\theta(s_t)$$ 
+$$A_\theta^T(s_t, a) = r_t + \gamma * r_{t+1} + \gamma^2 * r_{t+2} + \gamma^3 * r_{t+3} + \cdots + \gamma^T * r_T - V_\theta(s_t)$$  （注：随着 $A_\theta$ 阶数升高，$\boxed{偏差}$ ↓，$\boxed{方差}$ ↑）
 
+- **如果我们过早地停止累加真实的奖励项：**就会产生**高偏差（high bias）**，因为只使用了对价值函数的小部分近似和极少的真实奖励。
+- **如果我们累加过多的奖励项：**则会引入**高方差（high variance）**，因为依赖更多真实采样会让估计量不稳定。
 
+通过结合MC和TD的优势,兼顾近期和长期,使得结果更加可靠
 
+因此我们从AC算法需要的拟合policy-net以及value-net合并为只需要拟合$V_\theta$状态价值的的单个网络,降低了训练的复杂度
+
+$$\delta_t^V = r_t + \gamma * V_\theta(s_{t+1}) - V_\theta(s_t)$$
+ $$\delta_{t+1}^V = r_{t+1} + \gamma * V_\theta(s_{t+2}) - V_\theta(s_{t+1})$$
+
+$$\delta_t^V$$表示在t步采取特定动作带来的优势,通过代回A有
+
+  $$A_\theta^1(s_t, a) = \delta_t^V$$
+ $$A_\theta^2(s_t, a) = \delta_t^V + \gamma \delta_{t+1}^V$$
+ $$A_\theta^3(s_t, a) = \delta_t^V + \gamma \delta_{t+1}^V + \gamma^2 \delta_{t+2}^V$$
+
+GAE:延展到无穷步:
+
+$$ \begin{aligned} A_\theta^{GAE}(s_t, a) &= (1 - \lambda)\left(A_\theta^1 + \lambda * A_\theta^2 + \lambda^2 A_\theta^3 + \cdots\right) \\   &= (1 - \lambda)\left(\delta_t^V + \lambda * \left(\delta_t^V + \gamma\delta_{t+1}^V\right) + \lambda^2\left(\delta_t^V + \gamma\delta_{t+1}^V + \gamma^2\delta_{t+2}^V\right) + \cdots\right) \\ &= (1 - \lambda)\left(\delta_t^V(1 + \lambda + \lambda^2 + \cdots) + \gamma\delta_{t+1}^V * (\lambda + \lambda^2 + \cdots) + \cdots\right) \\ &= (1 - \lambda)\left(\delta_t^V \frac{1}{1-\lambda} + \gamma\delta_{t+1}^V \frac{\lambda}{1-\lambda} + \cdots\right) \\ &= \sum_{b=0}^{\infty} \left( (\gamma\lambda)^b \delta_{t+b}^V \right) \end{aligned} $$
+
+根据**重要性采样**,将on-policy转为off-policy,因此有loss函数:
+$$\begin{aligned}J(\theta)=  &\frac{1}{N} \sum_{n=1}^N \sum_{t=1}^{T_n} A_\theta^{GAE}(s_n^t, a_n^t) \nabla \log P_\theta(a_n^t | s_n^t) \\ &= \frac{1}{N} \sum_{n=1}^N \sum_{t=1}^{T_n} A_{\theta'}^{GAE}(s_n^t, a_n^t) \frac{P_\theta(a_n^t | s_n^t)}{P_{\theta'}(a_n^t | s_n^t)} \nabla \log P_\theta(a_n^t | s_n^t) \end{aligned} $$
+
+这个近似在$\theta$**变化不大**的前提下是可实现的,具体可上面
+
+为了近似, 下面这两个loss一个
+
+**附加KL散度的约束** $$ \text{Loss}_{ppo} = -\frac{1}{N} \sum_{n=1}^N \sum_{t=1}^{T_n} A_{\theta'}^{GAE}(s_n^t, a_n^t) \frac{P_\theta(a_n^t | s_n^t)}{P_{\theta'}(a_n^t | s_n^t)} + \beta \text{KL}(P_\theta, P_{\theta'}) $$ 
+**简单直接使用截断函数** $$ \text{Loss}_{ppo2} = -\frac{1}{N} \sum_{n=1}^N \sum_{t=1}^{T_n} \min\left( A_{\theta'}^{GAE}(s_n^t, a_n^t) \frac{P_\theta(a_n^t | s_n^t)}{P_{\theta'}(a_n^t | s_n^t)}, \text{clip}\left( \frac{P_\theta(a_n^t | s_n^t)}{P_{\theta'}(a_n^t | s_n^t)}, 1 - \varepsilon, 1 + \varepsilon \right) A_{\theta'}^{GAE}(s_n^t, a_n^t) \right) $$
 PPO近端策略优化
 
