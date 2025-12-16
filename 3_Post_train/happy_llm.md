@@ -14,6 +14,15 @@ $\mathrm{RMSNorm}(\mathbf{x})=\gamma\cdot\frac{\mathrm{x}}{\sqrt{\mathrm{RMS}(\m
 
 简化归一化计算的同时,保留关键信息
 
-TODO: https://datawhalechina.github.io/happy-llm/#/./chapter5/%E7%AC%AC%E4%BA%94%E7%AB%A0%20%E5%8A%A8%E6%89%8B%E6%90%AD%E5%BB%BA%E5%A4%A7%E6%A8%A1%E5%9E%8B5.1.5 
-LLaMA2 Decoder Layer
+在 [build_LLaMA2.ipynb](code\happy_LLM\build_LLaMA2.ipynb) ,Transformer类具有forward和generate两个方法
 
+| **特性**     | **forward (前向传播)**                                       | **generate (生成/推理)**                                     |
+| ------------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| **核心任务** | **预测概率**。给定一串词，算出词表中**每一个词**作为下一个词的概率。 | **创造文本**。利用 `forward` 的预测结果，实际决定下一个词是谁，并不断重复这个过程。 |
+| **执行次数** | 通常只执行**一次**（在训练时）或每生成一个词执行一次。       | 包含一个 `for` 循环，**多次**调用 `forward`。                |
+| **输出结果** | Logits（一堆原始数值/概率）和 Loss（损失）。                 | 最终人类可读的 Token 序列（完整的句子）。                    |
+| **使用场景** | **训练阶段**为主，或者作为推理的基础计算单元。               | **推理/应用阶段**（如聊天机器人回复用户）。                  |
+
+https://github.com/1224267419/happy-llm/blob/main/docs/chapter7/%E7%AC%AC%E4%B8%83%E7%AB%A0%20%E5%A4%A7%E6%A8%A1%E5%9E%8B%E5%BA%94%E7%94%A8.md
+
+TODO
