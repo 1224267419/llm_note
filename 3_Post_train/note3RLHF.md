@@ -82,6 +82,280 @@ $$\hat{P}[\sigma^{1} \succ \sigma^{2}] = \frac{\exp \sum \hat{r}(s_{t}^{1}, a_{t
 
 
 
-[LLM对齐中的RLHF+PPO](https://github.com/wlll123456/study_rlhf)
+## [RLHF+PPO](https://github.com/wlll123456/study_rlhf)
 
 这是使用gpt2进行RLHF的教程,具体[代码部分]()
+
+![img](note3RLHF.assets/v2-eb250d428d3b9a751d4ba3aeae70e290_1440w-1765942687098.jpg)
+
+LLM可以视为上图, 给定一个prompt，大模型会**在 $$t$$时刻生成一个token，然后下一个时刻根据prompt+上一时刻的token再去生成下一个token**，进行自回归的生成，所以可以定义**强化学习**中的各个概念为：
+
+- **动作$$a_t$$：**&#x751F;成的 `token`，动作空间就是整个词表，动作空间大小就是词表大小$$|V|$$
+- **策略$$\pi(a_t|s_t)$$：**&#x6839;据当前状态$$s_t$$生成动作`token`$$a_t$$的概率&#x20;
+- **状态$$s_t$$：**&#x4E0A;文以及$$t$$时刻前生成的**所有 token concat的 token 序列，**&#x521D;始状态 $$s_0$$就是prompt的token序列
+- **状态转移：**&#x8FD9;里的强化学习状态转移是确定性的，定义为**当前状态和动作的concat的token序列为下一个状态**，即$$s_{t+1}=[s_t,a_t]$$
+- **奖励$$r_t$$和价值 $$V_t$$：**&#x8FD9;里的定义就是一般强化学习的定义，**即时奖励以及状态价值函数**
+
+ $A_t$是由我们的语言模型产生的，$R_t$ ，$V_t$ 则分别由另外两个模型来产生 (Actor Model和Critic model)
+
+## 工作流程
+
+![img](note3RLHF.assets/v2-5b0028cc73d9f2aa599b256df24bda83_1440w.jpg)
+
+- 第一步，我们准备一个batch的prompts
+- 第二步，我们将这个batch的prompts喂给Actor模型，让它生成对应的responses
+- 第三步，我们把prompt+responses喂给我们的Critic/Reward/Reference模型，让它生成用于计算actor/critic loss的数据，按照强化学习的术语，我们称这些数据为经验（experiences）。critic loss我们将在后文做详细讲解，目前我们只把目光聚焦到actor loss上
+- 第四步，我们根据这些经验，实际计算出actor/critic loss，然后更新Actor和Critic模型
+
+
+
+### 四个角色
+
+![img](note3RLHF.assets/v2-22c2f6fce157dc4385a14f0de50d8136_1440w.jpg)
+
+如上图，**在RLHF-PPO阶段，一共有四个主要模型**，分别是：
+
+- **Actor Model：演员模型**，这就是我们想要训练的目标语言模型 s->a ,强化学习中的策略$\pi$
+- **Critic Model：评论家模型**，它的作用是预估总收益 s-> $V_t$
+- **Reward Model：奖励模型**，它的作用是计算即时收益 a-> $R_t$
+- **Reference Model：参考模型**，它的作用是在RLHF阶段**给语言模型增加一些“约束”**，防止语言模型训歪（朝不受控制的方向更新，效果可能越来越差）
+
+其中:
+
+- **Actor/Critic Model**在RLHF阶段是**需要训练**的（图中给这两个模型加了粗边，就是表示这个含义）；而**Reward/Reference Model**是**参数冻结**的。
+- Critic/Reward/Reference Model共同组成了一个“奖励-loss”计算体系（我自己命名的，为了方便理解），我们综合它们的结果计算loss，用于更新Actor和Critic Model
+
+#### Actor Model :  LLM
+
+即我们要训练的LLM,**用SFT阶段产出的SFT模型来对它做初始化**
+
+训练的最终目的是让Actor模型能**产生符合人类喜好的response**。所以我们的策略是，先喂给Actor一条prompt （这里假设batch_size = 1，所以是1条prompt），让它生成对应的response。然后，我们再将“prompt + response"送入我们的“奖励-loss”计算体系中去算得最后的loss，用于更新actor。
+
+
+
+#### Reference Model
+
+**我们希望训练出来的Actor模型既能达到符合人类喜好的目的，又尽量让它和SFT模型不要差异太大**。简言之，**我们希望两个模型的输出分布尽量相似**。那什么指标能用来衡量**输出分布的相似度**呢？我们自然而然想到了**KL散度**。
+
+- **对Actor模型**，我们喂给它一个prompt，它正常输出对应的response。那么response中每一个token肯定有它对应的log_prob结果呀，我们把这样的结果记为**log_probs**
+- **对Ref模型**，我们把Actor生成的"prompt + response"喂给它，那么它同样能给出每个token的log_prob结果，我们记其为**ref_log_probs** (类比`teacher forcing,用于计算**输出概率的kl散度**)
+
+#### Critic Model
+
+![img](note3RLHF.assets/v2-6d1497cc608b9b5fd059870c7117e381_1440w.jpg)
+
+用于预测期望总收益 $V_{t}$  **，和Actor模型一样，它需要做参数更新**。实践中，Critic Model的设计和初始化方式也有很多种，例如和Actor共享部分参数、从RW阶段的Reward Model初始化而来等等。我们讲解时，和deepspeed-chat的实现保持一致：从RW阶段的Reward Model初始化而来。
+
+**也就是在**  $t$ **时刻，我们给不出客观存在的总收益** $V_t$ **，我们只能训练一个模型去预测它。**
+**在RLHF中，我们不仅要训练模型生成符合人类喜好的内容的能力（Actor），也要提升模型对人类喜好量化判断的能力（Critic）**
+
+####  Reward Model（奖励模型）
+
+Reward Model用于计算生成token $A_{t}$ 的即时收益 $R_{t}$ ，它就是RW阶段所训练的奖励模型，在RLHF过程中，**它的参数是冻结的**。
+
+
+**你可能想问：为什么Critic模型要参与训练，而同样是和收益相关的Reward模型的参数就可以冻结呢？**
+这是因为，Reward模型是站在上帝视角的。这个上帝视角有两层含义：
+
+- 第一点，Reward模型是经过和“估算收益”相关的训练的，因此在RLHF阶段它可以直接被当作一个能产生客观值的模型。
+- 第二点，Reward模型代表的含义就是“即时收益”，你的token $A_{t}$  已经产生，因此即时收益 $R_{t}$ 自然可以立刻算出。
+
+### Loss设计
+
+#### Actor loss
+
+Actor loss : $actor\_loss = \sum -A_t \log P(A_t | S_t)$
+
+$A_t = R_t + \gamma * V_{t+1} - V_t$
+
+$A_t >0$意味着Critic对Actor当前采取的动作给了正向反馈，因此我们就需要在训练迭代中提高$P(A_t | S_t)$,从而减少loss (上面的$V_t$用动作优势 $A_t$ 替代)
+$A_t<0$则相反,不赘述
+
+
+
+deepspeed-chat的 $R_t$ 设计：
+
+$R_t =
+\begin{cases}
+-kl\_ctl \cdot \left( \log \frac{P(A_t|S_t)}{P_{ref}(A_t|S_t)} \right), & t \neq T \\
+-kl\_ctl \cdot \left( \log \frac{P(A_t|S_t)}{P_{ref}(A_t|S_t)} \right) + R_t, & t = T
+\end{cases}$
+
+$kl\_ctl$用于控制kl散度缩放比例, ( ) 中的内容即两个模型输出的kl散度 
+t=T : 在最后一步，模型既要受到“是否偏离原模型”的约束（前半部分），又要接收“**这句话写得好不好”的最终评价**（后半部分）。
+
+为什么只有最后一个时刻的 $R_t$ 被纳入了考量呢？这是因为在Reward模型训练阶段，就是用这个位置的 $R_t$ 来表示对完整的prompt + response的奖励预测（但不妨碍你理解成是执行完 $a_T$  的即时奖励），然后用这个指标来做模型eval的（但是Reward训练阶段算loss时，还是考虑了response部分所有token输出的reward值）。所以到了RLHF的场景下，**其余时刻**的即时奖励，我们就用“Actor**是否遵循了Ref的约束**”来进行评价。
+
+而且, $R_t$的设计并不只有一种,可以尝试把最后一个时刻的 $R_T$ 替换成所有token的即时奖励的平均值。如果站在这个角度理解的话，我们同样也可以尝试在每一个位置的奖励衡量上引入 $R_T$ ,
+
+##### $R_t$计算代码
+
+```python
+def compute_rewards(self, prompts, log_probs, ref_log_probs, reward_score,
+                        action_mask):
+        """
+        reward_function：计算最终的reward分数
+        复习一下几个相关参数的默认值：
+        self.kl_ctl = 0.1
+        self.clip_reward_value = 5
+        
+        对于batch中的某个prompt来说，它最终的reward分数为：
+        (1) 先计算actor和ref_model的logit相似度： -self.kl_ctl * (log_probs - ref_log_probs)
+            其实写成self.kl_ctl * (ref_log_probs - log_probs)更好理解些
+            这个值越大，说明ref_model对actor生成的结果的认可度越高（即表明rlhf没有训歪），
+            没有训歪的情况下我们也应该给模型一些奖励，这个奖励就是self.kl_ctl * (ref_log_probs - log_probs)
+            
+        （2）由于我们只取最后一个token对应位置的分数作为reward_score，因此我们只需要：
+            self.kl_ctl * (ref_log_probs - log_probs)的最后一位 + reward_score
+         
+         (3) 同时我们对reward_score也做了大小限制，最大不超过self.clip_reward_value（超过统一给成self.clip_reward_value），
+             最小不低于-self.clip_reward_value（低于统一给成-self.clip_reward_value）
+        
+         (4) 最后返回的rewards大小为：（batch_size, 各条数据的长度），对batch中的每条数据来说：
+             - response的最后一位：self.kl_ctl * (ref_log_probs - log_probs)的最后一位 + reward_score
+             - response的其余位置：self.kl_ctl * (ref_log_probs - log_probs)
+        
+        """
+
+        kl_divergence_estimate = -self.kl_ctl * (log_probs - ref_log_probs)
+        rewards = kl_divergence_estimate
+        # ---------------------------------------------------------------------------------------------------
+        # response开始的位置
+        # （因为我们对prompt做过padding处理，因此batch中每个prompt长度一致，也就意味着每个response开始的位置一致）
+        # （所以这里start是不加s的，只是一个int）
+        start = prompts.shape[1] - 1
+        # ---------------------------------------------------------------------------------------------------
+        # response结束的位置
+        # （因为一个batch中，每个response的长度不一样，所以response的结束位置也不一样）
+        # （所以这里end是加s的，ends的尺寸是(batch_size,)
+        # ---------------------------------------------------------------------------------------------------
+		#从 Response 开始往后有多少个真实的 Token（即 Response 的实际长度）
+        ends = start + action_mask[:, start:].sum(1) + 1
+        # ---------------------------------------------------------------------------------------------------
+        # 对rewards_score 做clip
+        # ---------------------------------------------------------------------------------------------------
+        reward_clip = torch.clamp(reward_score, -self.clip_reward_value,
+                                  self.clip_reward_value)
+        batch_size = log_probs.shape[0]
+        #遍历 Batch 中的每一条数据，只在 Response 的最后一个 Token 上，加上 Reward Model 的打分
+        for j in range(batch_size):
+            rewards[j, start:ends[j]][-1] += reward_clip[j] # 
+
+        return rewards
+```
+
+有了$R_t$,我们可以计算动作优势$A_t$然后引入GAE降低方差(推理具体看上一节RL),有下述代码
+
+##### $A_t$计算代码
+
+```python
+ def get_advantages_and_returns(self, values, rewards, start):
+        """
+        Adopted from https://github.com/CarperAI/trlx/blob/main/trlx/models/modeling_ppo.py#L134
+        
+        没有引入GAE前的t时刻的优势值：
+        detal_t = r_t + gamma * V_t+1 - V_t
+        其中：
+            - r_t表示t时刻的即时收益
+            - V_t+1表示未来时刻的预期收益
+            - r_t + gamma * V_t+1可理解成t时刻的实际预期收益
+            - V_t可理解成t时刻的预估预期收益（是模型，例如critic model自己估算出来的）
+        
+        引入GAE后的t时刻的优势值：
+        A_t = delta_t + gamma * lambda * A_t+1
+        粗暴理解为在t时刻时，不仅考虑当下优势，还考虑了未来的优势
+        为了知道A_t, 我们得知道A_t+1，所以在本算法中采取了从后往前做动态规划求解的方法，也即：
+        假设T是最后一个时刻，则有A_T+1 = 0, 所以有: A_T = delta_T
+        知道了A_T, 就可以依次往前倒推，把A_t-1, A_t-2之类都算出来了
+        
+        引入GAE后t时刻的实际预期收益
+        returns_t = A_t + V_t
+                  = delta_t + gamma * lambda * A_t+1 + V_t
+                  = r_t + gamma * V_t+1 - V_t + gamma * lambda * A_t+1 + V_t
+                  = r_t + gamma * (V_t+1 + lambda * A_t+1)
+        
+        注意，这里不管是advantages还是returns，都只算response的部分
+        """
+        
+        # Adopted from https://github.com/CarperAI/trlx/blob/main/trlx/models/modeling_ppo.py#L134
+        lastgaelam = 0
+        advantages_reversed = []
+        length = rewards.size()[-1]
+        # 注意这里用了reversed，是采取从后往前倒推计算的方式
+        for t in reversed(range(start, length)):
+            # 往后挪,用于下一步差分
+            nextvalues = values[:, t + 1] if t < length - 1 else 0.0
+            #detal_t= r_t + gamma * V_t+1 - V_t
+            delta = rewards[:, t] + self.gamma * nextvalues - values[:, t]
+            #GAE 优势:A_t= detal_t + gamma * lambda * A_t+1 
+            lastgaelam = delta + self.gamma * self.lam * lastgaelam
+            advantages_reversed.append(lastgaelam)
+        # 反转列表变回正序
+        advantages = torch.stack(advantages_reversed[::-1], dim=1) # 优势
+        # Returns = Advantage + Value
+        returns = advantages + values[:, start:] # 实际收益
+        # values: 预期收益
+        return advantages.detach(), returns
+```
+
+
+
+##### PPO-epoch: 引入新约束
+
+目前的actor_loss
+
+$actor\_loss = -A_t \log P(A_t | S_t)$
+
+其中，
+$$
+A_t = \left( R_t + \gamma * V_{t+1} - V_t \right) + \gamma * \lambda * A_{t+1}
+$$
+同时：
+- 我们已经对  $R_t$  进行来改造，使其能够衡量Actor模型是否遵从了Ref模型的约束。
+- 我们已经对  $A_t$  进行改造，使其不仅考虑了当前时刻的优势，还考虑了未来的优势
+
+1个batch的经验，用于计算ppo-epochs次loss，更新ppo-epochs次Actor和Critic模型 , 所以通过重要性采样 , 即可实现一次经验多次loss , 然后通过clip确保两个模型输出区别不太大,修正后有a_loss
+
+$$actor\_loss = -\min\left( Adv_t * \frac{P(A_t|S_t)}{P_{old}(A_t|S_t)}, \ Adv_t * \text{clip}\left( \frac{P(A_t|S_t)}{P_{old}(A_t|S_t)}, 1-\epsilon, 1+\epsilon \right) \right)$$
+
+综合上面的计算结果,有
+
+```python
+    def actor_loss_fn(self, logprobs, old_logprobs, advantages, mask):
+        """
+        logprobs: 实时计算的，response部分的prob（只有这个是随着actor实时更新而改变的）
+        old_logprobs：老策略中，response部分的prob （这个是固定的，不随actor实时更新而改变）
+        advantages： 老策略中，response部分每个token对应的优势（这个是固定的，不随actor实时更新而改变）
+        mask：老策略中，response部分对应的mask情况这个是固定的，不随actor实时更新而改变）
+        
+        之所以要引入logprobs计算actor_loss，是因为我们不希望策略每次更新的幅度太大，防止模型训歪
+        
+        self.cliprange: 默认值是0.2
+        """
+        ## policy gradient loss
+        # -------------------------------------------------------------------------------------
+        # 计算新旧策略间的KL散度
+        # -------------------------------------------------------------------------------------
+        log_ratio = (logprobs - old_logprobs) * mask
+        ratio = torch.exp(log_ratio)
+        # -------------------------------------------------------------------------------------
+        # 计算原始loss和截断loss
+        # -------------------------------------------------------------------------------------
+        pg_loss1 = -advantages * ratio
+        pg_loss2 = -advantages * torch.clamp(ratio, 1.0 - self.cliprange, 1.0 + self.cliprange)
+        pg_loss = torch.sum(torch.max(pg_loss1, pg_loss2) * mask) / mask.sum() # 最后是取每个非mask的response token的平均loss作为最终loss
+        return pg_loss
+```
+
+#### Critic Loss
+
+Critic Loss应为预测V和实际V的MSE,即 $Critic\_loss = \left( R_t + \gamma * V_{t+1} - V_t \right)^2$ ,那么接下来优化实际收益和预估收益
+
+##### 实际收益优化
+
+$R_t + \gamma * V_{t+1}$ -> $A_t + V_t$
+
+##### 预估收益优化
+
+[TODO 预估收益优化](https://zhuanlan.zhihu.com/p/677607581)
+

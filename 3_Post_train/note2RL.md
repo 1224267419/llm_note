@@ -816,7 +816,7 @@ https://www.bilibili.com/video/BV1qrbrzqEwL/?spm_id_from=333.337.search-card.all
 PPO 的目标是限制新策略与旧策略之间的差异，以保证训练的稳定性, 有两种方式
 
 #### (1) PPO-惩罚 (PPO-Penalty)
-[image-20251210220337890](./note2RL.assets/image-20251210220337890.png)
+![image-20251210220337890](./note2RL.assets/image-20251210220337890.png)
 
 
 - **方法**：利用拉格朗日乘数法，直接将 KL 散度（衡量两个分布差异的指标）**作为惩罚项加入到目标函数中，使其变成一个无约束优化问题**。
