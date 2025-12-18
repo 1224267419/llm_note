@@ -82,9 +82,21 @@ $$\hat{P}[\sigma^{1} \succ \sigma^{2}] = \frac{\exp \sum \hat{r}(s_{t}^{1}, a_{t
 
 
 
-## [RLHF+PPO](https://github.com/wlll123456/study_rlhf)
+# RLHF+PPO
 
-这是使用gpt2进行RLHF的教程,具体[代码部分]()
+## RLHF+PPO的简化理解
+
+包括各个模型的loss等
+
+### 参考文献:
+
+https://zhuanlan.zhihu.com/p/677607581 :直觉和实践,这个更好用
+
+https://zhuanlan.zhihu.com/p/7461863937 :原理,结合b站 强化学习数学原理看
+
+https://github.com/wlll123456/study_rlhf 代码
+
+上面两篇文章讲的非常好,建议多看看
 
 ![img](note3RLHF.assets/v2-eb250d428d3b9a751d4ba3aeae70e290_1440w-1765942687098.jpg)
 
@@ -351,11 +363,76 @@ $$actor\_loss = -\min\left( Adv_t * \frac{P(A_t|S_t)}{P_{old}(A_t|S_t)}, \ Adv_t
 
 Critic Loss应为预测V和实际V的MSE,即 $Critic\_loss = \left( R_t + \gamma * V_{t+1} - V_t \right)^2$ ,那么接下来优化实际收益和预估收益
 
-##### 实际收益优化
+##### 实际收益(优化后的critic网络输出)优化
 
 $R_t + \gamma * V_{t+1}$ -> $A_t + V_t$
 
-##### 预估收益优化
+##### 预估收益(优化前critic网络输出)优化
 
-[TODO 预估收益优化](https://zhuanlan.zhihu.com/p/677607581)
 
+
+取实际收益和预估收益的MSE做为loss , 加上clip,**防止value剧烈变化**导致loss骤减
+
+```python
+def critic_loss_fn(self, values, old_values, returns, mask):
+        """
+        values: 实时critic跑出来的预估预期收益（是变动的，随着ppo epoch迭代而改变）
+        old_values：老critic跑出来的预估预期收益（是固定值）
+        returns：实际预期收益
+        mask：response部分的mask
+        
+        self.cliprange_value = 0.2
+        """
+        ## value loss
+        # 用旧的value去约束新的value
+        values_clipped = torch.clamp(
+            values,
+            old_values - self.cliprange_value,
+            old_values + self.cliprange_value,
+        )
+        
+        #用fp64计算防止下溢
+        if self.compute_fp32_loss:
+            values = values.float()
+            values_clipped = values_clipped.float()
+        
+        # critic模型的loss定义为（预估预期收益-实际预期收益）**2
+        #计算两个均方差,并取最大值
+        vf_loss1 = (values - returns)**2
+        vf_loss2 = (values_clipped - returns)**2
+        vf_loss = 0.5 * torch.sum(
+            torch.max(vf_loss1, vf_loss2) * mask) / mask.sum() # 同样，最后也是把critic loss平均到每个token上
+        return vf_loss
+```
+
+#### Reward Loss
+
+PPO训练过程中 Reward Model参数被冻结,一般是在SFT model的基础上加上Value Head进行训练
+
+**Reward Model训练的loss如下：**
+
+$$\text{Reward\_loss}=- \mathbb{E}_{(x,y_w,y_l)\sim D} \left[\log\left(\sigma\left(r(x,y_w)-r(x,y_l)\right)\right)\right]$$
+
+其中$$x,y_w,y_l$$分别表示  prompt、 chosen response 和  rejected response
+
+
+sigmoid函数： $$\sigma(x)=\frac{1}{1+\exp(-x)}$$，所以 $$\sigma(r(x,y_w)-r(x,y_r))=\frac{\exp(r(x,y_w))}{\exp(r(x,y_w))+\exp(r(x,y_l))}$$
+
+最后的reward loss为
+
+$$\text{Reward\_loss}=- \mathbb{E}_{(x,y_w,y_l)\sim D} \left[\log\frac{\exp(r(x,y_w))}{\exp(r(x,y_w))+\exp(r(x,y_l))}\right]$$
+
+```python
+class PairWiseLoss(nn.Module):
+    """
+    Pairwise Loss for Reward Model
+    """
+    def forward(self, chosen_reward, reject_reward, margin):
+        if margin is not None:
+            loss = -F.logsigmoid(chosen_reward - reject_reward - margin)
+        else:
+            loss = -F.logsigmoid(chosen_reward - reject_reward)
+        return loss.mean()
+```
+
+和RL中的episode中每个action都求loss想比, LLM中RLHF仅对整个response进行求loss , 
