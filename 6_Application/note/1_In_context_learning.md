@@ -317,7 +317,7 @@ conf['evaluation']['method'], conf['evaluation'])
     return res, demo_fn
 ```
 
-## **3. EvoPrompt: 结合进化算法的优化 (Evolutionary Algorithms)**
+## **EvoPrompt: 结合进化算法的优化 (Evolutionary Algorithms)**
 
 该框架将 Prompt 视为进化的“个体”，利用进化算法（GA/DE）的框架，配合 LLM 的语义处理能力进行优化。
 
@@ -331,7 +331,7 @@ conf['evaluation']['method'], conf['evaluation'])
 
 ------
 
-## **4. PromptWizard: 任务感知的反馈优化框架**
+## **PromptWizard: 任务感知的反馈优化框架**
 
 这是一个更精细的框架，通过**“批判-合成”**机制，同时优化 Prompt 指令和上下文示例（Few-shot Examples）。
 
@@ -343,4 +343,4 @@ conf['evaluation']['method'], conf['evaluation'])
 - **双线优化 (Sequential Optimization)：**
   - **优化示例：** 挑选多样化的正负例，甚至通过分析不足来“合成”新的困难示例（如增加分数的算术题）。
   - **优化指令：** 基于优化后的示例，再次批判并调整指令。
-- **增强特性：** 自动生成思维链（CoT）步骤，并为 Prompt 设定专家角色（如“数学教育者”）。
+- **增强特性：** 自动生成思维链（CoT）步骤，并为 Prompt 设定专家角色（如“数学教育者”）。                                                                                                                                                                                                              
