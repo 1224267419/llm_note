@@ -1,3 +1,5 @@
+
+
 ![](./note3RLHF.assets/diagram.png)
 
 LLM可以视为上图, 给定一个prompt，大模型会**在 $$t$$时刻生成一个token，然后下一个时刻根据prompt+上一时刻的token再去生成下一个token**，进行自回归的生成，所以可以定义**强化学习**中的各个概念为：
@@ -163,8 +165,7 @@ LLM可以视为上图, 给定一个prompt，大模型会**在 $$t$$时刻生成�
 
 ####  Reward Model（奖励模型）
 
-Reward Model用于计算生成token $A_{t}$ 的即时收益 $R_{t}$ ，它就是RW阶段所训练的奖励模型，在RLHF过程中，**它的参数是冻结的**。
-
+Reward Model用于计算生成token $A_{t}$ 的即时收益 $R_{t}$ ，它就是**RW阶段所训练的奖励模型**(可以由SFT model训练得到,也可以像deepseek--R1-Zero一样,使用基于规则的代码得到)，在RLHF过程中，**它的参数是冻结的**。
 
 **你可能想问：为什么Critic模型要参与训练，而同样是和收益相关的Reward模型的参数就可以冻结呢？**
 这是因为，Reward模型是站在上帝视角的。这个上帝视角有两层含义：
@@ -576,7 +577,7 @@ $$\nabla_\theta J_{PPO}(\theta) = \mathbb{E}\left[\frac{1}{T}\sum_{t=1}^{T} A_t 
 
 可以节省critic模型 , 大大节约显存, 节省的显存可以用于增大generate_batch_size , 降低平均分数的方差
 
-常用的便是用优势函数Advantage来指导，**优势函数原始定义为 $$A_t = Q(s_t,a_t)-V(s_t)$$即当前动作的价值比平均动作价值高出的部分 *
+常用的便是用优势函数Advantage来指导，**优势函数原始定义为 $$A_t = Q(s_t,a_t)-V(s_t)$$即当前动作的价值比平均动作价值高出的部分 **
 
 #### GRPO的优势函数估计
 
@@ -584,9 +585,281 @@ GRPO通过**对相同问题 $$q$$用 $$\pi_{\theta_{old}}$$采样的多个一组
 
 $$\hat{A}_i = \frac{r_i - \text{Mean}(\mathbf{r})}{\text{Std}(\mathbf{r}) + \epsilon}$$ ,**这就是对采样的这一组输出的奖励计算归一化奖励作为输出的优势函数，同时赋值给输出中每一个token作为该token处的优势函数。简单理解就是当前第$$i$$个输出的奖励 $$r_i(q,o_i)$$比所有输出的奖励平均值高出的优势（可以为负）**
 
+用 $$r_i(q,o_i)$$估计 $$Q(q,o_i)$$，用 $$\text{mean}(\bold{r})=\frac{1}{G}\sum_i^G r(q,o_i)$$来估计 $$V(q)$$是合理的，前提是group采样足够多，然后得到优势函数的估计 $$A(q,o_i)=Q(q,o_i)-V(q)$$。除以 $$\text{std}(\bold{r})$$是为了归一化
+
+但是这样得到的优势是整个 $$(q,o_i)$$的优势值，**GRPO在这里则将整个优势值用在了输出$$o_i$$每一个的每一个token上（广播broadcast操作）**，相当于当前policy去更新输出 $$o_i$$中每一个token的条件输出概率 $$\pi_\theta(a_t|s_t)$$的**更新幅度和方向是一致的**
+
+ 奖励是针对**整句话**的（比如 +10 分），但模型参数更新是针对**每个字（Token）**的。我怎么知道这句话里哪个字写得好:  **这句话中所有 Token 的出现概率都会被同幅度、同方向地提高** 虽然简单粗暴,但平均下来确实会让好的token出现概率提升
+
 ![](note3RLHF.assets/image-6.png)
 
 ![](note3RLHF.assets/image-7.png)
 
+### ORM 结果奖励监督RL
+
+**即使用传统的ORM（Outcome Reward Model）来进行强化学习过程，针对这种情况，模型对一组输出生成一组奖励值 $$\bold{r}=\{r_1, r_2,\cdots,r_G\}$$，然后通过下式对优势函数进行估计：**
+
+**$$\hat{A}_{i,t}=\hat{r_i}=\frac{r_i-\text{mean}(\bold{r})}{\text{std}(\bold{r})}$$**
+
+**上述式子就是对采样的这一组输出的奖励计算归一化奖励作为输出的优势函数，同时赋值给输出中每一个token作为该token处的优势函数。简单理解就是当前第$$i$$个输出的奖励 $$r_i(q,o_i)$$比所有输出的奖励平均值高出的优势（可以为负）**
+
+#### **为什么可以这么做？**
+
+回顾强化学习中价值函数的定义为回报（折扣累积奖励）的期望：
+
+在**结果奖励监督RL**的设定下，就是从问题$$q$$到输出 $$o$$，状态是 $$q$$，动作是 $$o$$，**只有一步奖励**即 $$r(q,o)$$，所以价值函数可以进一步写成：
+
+$$ V(s) = \mathbb{E}_\pi[R_t|s_t=s]$$
+
+$$Q(s,a)=\mathbb{E}_\pi[R_t|s_t=s,a_t=a]=R(s,a)$$
+
+所以用 $$r_i(q,o_i)$$估计 $$Q(q,o_i)$$，用 $$\text{mean}(\bold{r})=\frac{1}{G}\sum_i^G r(q,o_i)$$来估计 $$V(q)$$是合理的，前提是group采样足够多，然后得到优势函数的估计 $$A(q,o_i)=Q(q,o_i)-V(q)$$。除以 $$\text{std}(\bold{r})$$是为了归一化
+
+但是这样得到的优势是整个 $$(q,o_i)$$的优势值，**GRPO在这里则将整个优势值用在了输出$$o_i$$每一个的每一个token上（广播broadcast操作）**，相当于当前policy去更新输出 $$o_i$$中每一个token的条件输出概率 $$\pi_\theta(a_t|s_t)$$的**更新幅度和方向是一致的**
+
+![](note3RLHF.assets/diagram-7.png)
+
+### PRM 过程奖励监督RL
+
+使用PRM来进行强化学习，同样采样group输出，对应的一组奖励值为 :
+$$
+\mathbf{R}=\left\{\left\{r_{1}^{\mathrm{index}(1)},\cdots,r_{1}^{\mathrm{index}(K_1)}\right\},\cdots,\left\{r_{G}^{\mathrm{index}(1)},\cdots,r_{G}^{\mathrm{index}(K_G)}\right\}\right\}
+$$
+其中 $$index(j)$$为第 $$j$$个步骤的 end token的index， $$K_i$$是第 $$i$$个输出的步骤个数，GRPO计算优势如下：
+
+$$\hat{A}_{i,t}=\sum_{\mathrm{index}(j)\geq t} \widetilde{r}_{i}^{\mathrm{index}(j)} =\sum_{\mathrm{index}(j)\geq t} \frac{{r}_{i}^{\mathrm{index}(j)}-\text{mean}(\bold{r})}{\text{std}(\bold{r})}$$
+
+GRPO 中的 PRM 处理逻辑其实就是两步走：
+
+1. **横向比较  $$\widetilde{r}_{i}^{\mathrm{index}(j)} = \frac{{r}_{i}^{\mathrm{index}(j)}-\text{mean}(\bold{r})}{\text{std}(\bold{r})}$$ （Normalization）：** 先看你在同伴中排老几。把每一步的原始分变成相对分（`rh`）。这是为了消除题目难度的影响。
+2. **纵向累加  $\sum$ （Aggregation/Summation）：** 再看你的长远贡献。每一个步骤的最终优势（`A`），等于它**这一刻的相对分**加上**未来所有时刻的相对分**。这是为了符合强化学习“回报（Return）”的定义，确保模型有长远眼光。
 
 
+
+![](note3RLHF.assets/diagram-8.png)
+
+
+
+最后不管是ORM还是PRM进行强化学习，都用下式进行策略更新：
+
+主体依然是 PPO 的形式：`min(ratio * A, clip(ratio) * A)`,使用clip防止过大更新 , 
+ 根据你是用 ORM 还是 PRM，代入上面不同的 $A$ 计算方法(ORM PRM)
+KL 散度采用了一个**无偏估计等式**:$$D_{KL} = \frac{\pi_{ref}}{\pi} - \log \frac{\pi_{ref}}{\pi} - 1$$  ,[Schulman 近似的KL散度]([近似 KL 散度 --- Approximating KL Divergence](http://joschu.net/blog/kl-approx.html)),计算量低,始终非负且凸,方差更小 ; 且和PPO   $R = R_{raw} - \beta \log(\pi/\pi_{ref})$   不同 ,
+GRPO的 KL 作为一个独立的正则项减在 Loss 后面(而不是reward的一部分) ,
+
+1. 如果放在奖励R里面,由于$A = \frac{R - \text{Mean}}{\text{Std}}$ , 会掩盖KL偏离(哪怕KL偏离很大,也因为正则化消去)
+
+2. GRPO **没有 Critic**。它不需要预测未来价值。因此，不需要费尽心机地把 KL 塞进奖励里让 Critic 去学。直接在更新梯度的 Loss 阶段加上 KL 正则项，是最直接、最高效的手段。
+
+3. 将这个严格非负的数学项直接作为 Loss 的一部分，在数学性质上比“在奖励里减去一个可能是负数的 $\log p - \log q$”更加稳定（参考之前的讨论，直接采样的 KL 可能为负，导致奖励变成正向激励）。
+
+   把它放在 Loss 端，作为一个明确的优化目标（Minimization Objective），比作为奖励信号（Reward Signal）更容易控制优化的幅度。
+
+
+$$
+\mathcal{J}_{GRPO}(\theta)=\mathbb{E}[q\sim P(Q),\{o_i\}_{i = 1}^{G}\sim\pi_{\theta_{old}}(O|q)]\\
+\quad\quad\frac{1}{G}\sum_{i = 1}^{G}\frac{1}{|o_i|}\sum_{t = 1}^{|o_i|}\left\{\min\left[\frac{\pi_{\theta}(o_{i,t}|q,o_{i,<t})}{\pi_{\theta_{old}}(o_{i,t}|q,o_{i,<t})}\hat{A}_{i,t},\mathrm{clip}\left(\frac{\pi_{\theta}(o_{i,t}|q,o_{i,<t})}{\pi_{\theta_{old}}(o_{i,t}|q,o_{i,<t})},1 - \varepsilon,1+\varepsilon\right)\hat{A}_{i,t}\right]-\beta\mathbb{D}_{KL}[\pi_{\theta}||\pi_{ref}]\right\}
+$$
+
+$$
+\text{GRPO}:\quad
+\mathbb{D}_{KL}[\pi_{\theta}||\pi_{ref}]=\frac{\pi_{ref}(o_{i,t}|q,o_{i,<t})}{\pi_{\theta}(o_{i,t}|q,o_{i,<t})}-\log\frac{\pi_{ref}(o_{i,t}|q,o_{i,<t})}{\pi_{\theta}(o_{i,t}|q,o_{i,<t})}-1
+$$
+
+$$
+\text{PPO}:\quad
+r_t = r_{\varphi}(q, o_{\leq t}) - \beta \log \frac{\pi_{\theta}(o_t|q, o_{<t})}{\pi_{ref}(o_t|q, o_{<t})}
+$$
+下面是trl中的grpo代码 , 参考理解一下
+
+```python
+def compute_loss(self, model, inputs, return_outputs=False, num_items_in_batch=None):
+    if return_outputs:
+        raise ValueError("The GRPOTrainer does not support returning outputs")
+    # 计算模型的每个 token 的对数概率
+
+    prompt_ids, prompt_mask = inputs["prompt_ids"], inputs["prompt_mask"]
+    completion_ids, completion_mask = inputs["completion_ids"], inputs["completion_mask"]
+    input_ids = torch.cat([prompt_ids, completion_ids], dim=1)
+    attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)
+    logits_to_keep = completion_ids.size(1)  # 我们只需要计算生成部分（completion）token 的 logits
+
+    per_token_logps = self._get_per_token_logps(model, input_ids, attention_mask, logits_to_keep)
+
+    # 计算模型与参考模型之间的 KL 散度
+	# Schulman 近似的KL散度,计算量低,始终非负且凸,方差更小
+    ref_per_token_logps = inputs["ref_per_token_logps"]
+    per_token_kl = torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1
+
+    # x - x.detach() 允许保留来自 x 的梯度
+    advantages = inputs["advantages"]
+    per_token_loss = torch.exp(per_token_logps - per_token_logps.detach()) * advantages.unsqueeze(1)
+    per_token_loss = -(per_token_loss - self.beta * per_token_kl)
+    loss = ((per_token_loss * completion_mask).sum(dim=1) / completion_mask.sum(dim=1)).mean()
+
+    # 记录指标
+    completion_length = self.accelerator.gather_for_metrics(completion_mask.sum(1)).float().mean().item()
+    self._metrics["completion_length"].append(completion_length)
+
+    mean_kl = ((per_token_kl * completion_mask).sum(dim=1) / completion_mask.sum(dim=1)).mean()
+    self._metrics["kl"].append(self.accelerator.gather_for_metrics(mean_kl).mean().item())
+
+    return loss
+    
+def _get_per_token_logps(self, model, input_ids, attention_mask, logits_to_keep):
+    # 我们在 `logits_to_keep` 上加 1，因为序列的最后一个 logit 稍后会被排除
+    logits = model(
+        input_ids=input_ids, attention_mask=attention_mask, logits_to_keep=logits_to_keep + 1
+    ).logits  # (批大小, 长度, 词表大小)
+    logits = logits[:, :-1, :]  # (B, L-1, V), 排除最后一个 logit：它对应于下一个 token 的预测
+
+    # 计算输入 token 的对数概率。使用循环以降低内存峰值。
+    per_token_logps = []
+    for logits_row, input_ids_row in zip(logits, input_ids[:, -logits_to_keep:]):
+        log_probs = logits_row.log_softmax(dim=-1)
+        token_log_prob = torch.gather(log_probs, dim=1, index=input_ids_row.unsqueeze(1)).squeeze(1)
+        per_token_logps.append(token_log_prob)
+    return torch.stack(per_token_logps)
+
+def _prepare_inputs(self, inputs: dict[str, Union[torch.Tensor, Any]]) -> dict[str, Union[torch.Tensor, Any]]:
+    device = self.accelerator.device
+    prompts = [x["prompt"] for x in inputs]
+    prompts_text = [maybe_apply_chat_template(example, self.processing_class)["prompt"] for example in inputs]
+    prompt_inputs = self.processing_class(
+        prompts_text, return_tensors="pt", padding=True, padding_side="left", add_special_tokens=False
+    )
+    prompt_inputs = super()._prepare_inputs(prompt_inputs)
+    prompt_ids, prompt_mask = prompt_inputs["input_ids"], prompt_inputs["attention_mask"]
+
+    if self.max_prompt_length is not None:
+        prompt_ids = prompt_ids[:, -self.max_prompt_length :]
+        prompt_mask = prompt_mask[:, -self.max_prompt_length :]
+        
+    # 组采样:对每个prompt生成n个回复
+    with unwrap_model_for_generation(self.model, self.accelerator) as unwrapped_model:
+        prompt_completion_ids = unwrapped_model.generate(
+            prompt_ids, attention_mask=prompt_mask, generation_config=self.generation_config
+        )
+
+    # 计算提示长度并提取 completion ids
+    prompt_length = prompt_ids.size(1)
+    prompt_ids = prompt_completion_ids[:, :prompt_length]
+    completion_ids = prompt_completion_ids[:, prompt_length:]
+    prompt_mask = prompt_mask.repeat_interleave(self.num_generations, dim=0)
+
+    # 屏蔽第一个 EOS token 之后的所有内容
+    is_eos = completion_ids == self.processing_class.eos_token_id
+    eos_idx = torch.full((is_eos.size(0),), is_eos.size(1), dtype=torch.long, device=device)
+    eos_idx[is_eos.any(dim=1)] = is_eos.int().argmax(dim=1)[is_eos.any(dim=1)]
+    sequence_indices = torch.arange(is_eos.size(1), device=device).expand(is_eos.size(0), -1)
+    completion_mask = (sequence_indices <= eos_idx.unsqueeze(1)).int()
+
+    # 将 prompt_mask 与 completion_mask 拼接用于 logit 计算
+    attention_mask = torch.cat([prompt_mask, completion_mask], dim=1)  # (B*G, P+C)
+
+    logits_to_keep = completion_ids.size(1)  # 我们只需要计算 completion tokens 的 logits
+
+    with torch.inference_mode():
+        ref_per_token_logps = self._get_per_token_logps(
+            self.ref_model, prompt_completion_ids, attention_mask, logits_to_keep
+        )
+    # 解码生成的 completions
+    completions = self.processing_class.batch_decode(completion_ids, skip_special_tokens=True)
+    if is_conversational(inputs[0]):
+        completions = [[{"role": "assistant", "content": completion}] for completion in completions]
+
+    # 计算奖励
+    prompts = [prompt for prompt in prompts for _ in range(self.num_generations)]  # 重复 prompts
+
+    rewards_per_func = torch.zeros(len(prompts), len(self.reward_funcs), device=device)
+    for i, (reward_func, reward_processing_class) in enumerate(
+        zip(self.reward_funcs, self.reward_processing_classes)
+    ):
+        if isinstance(reward_func, nn.Module):  # 使用 Module 而不是 PretrainedModel 以兼容编译模型
+            if is_conversational(inputs[0]):
+                messages = [{"messages": p + c} for p, c in zip(prompts, completions)]
+                texts = [apply_chat_template(x, reward_processing_class)["text"] for x in messages]
+            else:
+                texts = [p + c for p, c in zip(prompts, completions)]
+            reward_inputs = reward_processing_class(
+                texts, return_tensors="pt", padding=True, padding_side="right", add_special_tokens=False
+            )
+            reward_inputs = super()._prepare_inputs(reward_inputs)
+            with torch.inference_mode():
+                rewards_per_func[:, i] = reward_func(**reward_inputs).logits[:, 0]  # Shape (B*G,)
+        else:
+            # 重复所有输入列（除了 "prompt" 和 "completion"）以匹配生成数量
+            reward_kwargs = {key: [] for key in inputs[0].keys() if key not in ["prompt", "completion"]}
+            for key in reward_kwargs:
+                for example in inputs:
+                    # Repeat each value in the column for `num_generations` times
+                    reward_kwargs[key].extend([example[key]] * self.num_generations)
+            output_reward_func = reward_func(prompts=prompts, completions=completions, **reward_kwargs)
+            rewards_per_func[:, i] = torch.tensor(output_reward_func, dtype=torch.float32, device=device)
+
+    # 对所有奖励函数的奖励求和
+    rewards = rewards_per_func.sum(dim=1)
+
+    # 计算组内奖励
+    mean_grouped_rewards = rewards.view(-1, self.num_generations).mean(dim=1)
+    std_grouped_rewards = rewards.view(-1, self.num_generations).std(dim=1)
+
+    # 归一化奖励以计算优势
+    mean_grouped_rewards = mean_grouped_rewards.repeat_interleave(self.num_generations, dim=0)
+    std_grouped_rewards = std_grouped_rewards.repeat_interleave(self.num_generations, dim=0)
+    advantages = (rewards - mean_grouped_rewards) / (std_grouped_rewards + 1e-4)
+   
+    return {"prompt_ids": prompt_ids,"prompt_mask": prompt_mask,"completion_ids": completion_ids,"completion_mask": completion_mask,"ref_per_token_logps": ref_per_token_logps,
+        "advantages": advantages,
+    }
+```
+
+#### GRPO实际训练中的问题及解法
+
+LLM通过GRPO 这种 On-Policy 方法进行RL训练时，普遍存在Policy Collapse问题，即策略熵急剧下降。这一现象直接导致模型生成内容的探索性丧失和多样性不足，最终表现为**大量重复或模式化的输出**。具体表现来说，可能有下面两种情况：
+
+**Entropy Collapse**：GRPO通常采用 Critic-Free设计，使其策略梯度对长序列任务中**高方差、稀疏的奖励信号极其敏感**。策略为规避这种不确定性，会倾向于快速收缩至低熵、高确定性的模式，即策略熵单调递减。 
+
+**Reward Hacking**：**重复性内容**是模型最大化RM评分的一种**低成本作弊策略**。若 RM 隐性地将回复长度或冗余信息与高奖励关联，GRPO将精确遵循此信号，鼓励模型生成重复且更长的文本。
+
+**其他可能的原因**：在做RLVR时，标注者倾向选择常见答案，这会加剧模式坍塌，即使奖励模型完美也无法消除。该偏差在最优策略中表现为对常见模式的“温度锐化”，促使模型输出向偏好的单一模式收敛。
+
+| **解法**        | **核心机制**         | **主要解决的问题**                              |
+| --------------- | -------------------- | ----------------------------------------------- |
+| **1. AEPO**     | 温度调整 + 梯度重构  | 🛑 **彻底根治 Entropy Collapse** (不让熵掉下来)  |
+| **2. Clip-Cov** | Token级裁剪高协方差  | 🔄 **缓解 Reward Hacking** (特别是 Token 级重复) |
+| **3. PF-PPO**   | 策略过滤低信噪比样本 | 📉 **防止过拟合导致的 Hacking 和 Collapse**      |
+| **4. 调参**     | 温度/KL/Clip         | ⚖️ **平衡探索与利用** (综合治理)                 |
+
+# RLHF-PPO的缺点**
+
+- **两阶段训练带来的信息损失：**LHF的过程是先利用偏好数据训练一个奖励函数模型，然后再用PPO或者其他强化学习算法训练最后的策略。这个过程中如果**奖励函数模型学习存在偏差**，比如奖励实际上并没有和人类偏好对齐的很好，那么后续的强化学习过程也会导致策略陷入次优
+- **PPO算法带来的额外训练资源需求：**强化学习的训练会伴随着探索和利用（explore and exploit）的过程，一般会较不稳定，PPO算法在工程实现上利用了很多trick去保障训练的稳定和收敛。但是**<span style="color: inherit; background-color: rgba(255,246,122,0.8)">PPO仍然引入了Actor、Critic、Reward和Reference四个模型</span>**，在传统强化学习环境中，Actor和Critic以及Reference都是简单的网络实现，reward是环境自带的人为设计好的，所以并不存在大规模的资源需求，而到了LLM这里，所有的模型都是基于LLM（SFT）模型初始化或者改进的，那么即使在PPO训练过程中只有Actor和Critic需要更新参数，四个模型的推理和训练就需要大量的计算资源，以及四个模型也会带来更多的累积误差
+
+
+
+![](note3RLHF.assets/image-8.png)
+
+## [DPO]([arxiv.org/pdf/2305.18290](https://arxiv.org/pdf/2305.18290))
+
+虽然DPO不是RL方法,它优化了RL部分(把actor部分优化了)
+
+RLHF 的标准目标函数：
+
+$$\max _\pi \mathbb{E}_{x \sim \mathcal{D}, y \sim \pi} [r(x, y)] - \beta D_{\text{KL}} [\pi(y|x) \| \pi_{\text{ref}}(y|x)]$$
+
+这个公式的意思是：我们希望训练一个策略 $\pi$，使其生成的回答 $y$ 能获得**最高的奖励 $r$**（符合人类偏好），同时**不能偏离**原始模型 $\pi_{\text{ref}}$ 太多
+
+经过(取负号将 $\max$ 变为 $\min$，将 $r$ 放入 $\log$ 中等)变换 , 目标函数重写为：
+
+$$\min _\pi \mathbb{E}_{x \sim \mathcal{D}} \mathbb{E}_{y \sim \pi(y|x)} \left[ \log \frac{ \pi(y|x) }{\frac{1}{Z(x)} \pi_{\text{ref}}(y|x)\exp \left( \frac{1}{\beta} r(x, y) \right)} - \log Z(x) \right]$$ ,$\pi_{\text{ref}} \cdot \exp(r)$ 这一项积分不等于 1，不是一个合法的概率分布。除以归一化因子 $Z(x)$ 后，它就变成了一个合法的概率分布
+
+定义一个理想的策略 $\pi^*$：$$\pi^*(y|x) = \frac{1}{Z(x)} \pi_{\text{ref}}(y|x) \exp \left( \frac{1}{\beta} r(x, y) \right)$$
+
+最优策略 $\pi^*$ 其实就是“原始模型 $\pi_{\text{ref}}$”加上“奖励信号 $r$”的加权修正
+
+
+
+TODO
+
+ReMax往后先放一放
