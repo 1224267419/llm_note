@@ -411,7 +411,7 @@ PPO训练过程中 Reward Model参数被冻结,一般是在SFT model的基础上
 
 **Reward Model训练的loss如下：**
 
-$$\text{Reward\_loss}=- \mathbb{E}_{(x,y_w,y_l)\sim D} \left[\log\left(\sigma\left(r(x,y_w)-r(x,y_l)\right)\right)\right]$$
+$$\text{Reward_loss}=- \mathbb{E}_{(x,y_w,y_l)\sim D} \left[\log\left(\sigma\left(r(x,y_w)-r(x,y_l)\right)\right)\right]$$
 
 其中$$x,y_w,y_l$$分别表示  prompt、 chosen response 和  rejected response
 
@@ -420,7 +420,7 @@ sigmoid函数： $$\sigma(x)=\frac{1}{1+\exp(-x)}$$，所以 $$\sigma(r(x,y_w)-r
 
 最后的reward loss为
 
-$$\text{Reward\_loss}=- \mathbb{E}_{(x,y_w,y_l)\sim D} \left[\log\frac{\exp(r(x,y_w))}{\exp(r(x,y_w))+\exp(r(x,y_l))}\right]$$
+$$\text{Reward_loss}=- \mathbb{E}_{(x,y_w,y_l)\sim D} \left[\log\frac{\exp(r(x,y_w))}{\exp(r(x,y_w))+\exp(r(x,y_l))}\right]$$
 
 ```python
 class PairWiseLoss(nn.Module):
@@ -435,4 +435,158 @@ class PairWiseLoss(nn.Module):
         return loss.mean()
 ```
 
-和RL中的episode中每个action都求loss想比, LLM中RLHF仅对整个response进行求loss , 
+和RL中的episode中每个action都求loss想比, LLM中RLHF**仅对整个response进行求loss** , 
+
+
+
+对比一下我们前面**3.3.2章节[ 3.3 RLHF 基于人类反馈的强化学习](https://kcnd4kn8i6ap.feishu.cn/wiki/TQqTwh2uwiSrqYktIPccTQOcn0g?fromScene=spaceOverview#share-Wq9IdaBcnoFbVNxMffzcxW2xnMd)**&#x4F20;统强化学习的RLHF的loss：
+
+$$\text{Reward_loss}  =- \mathbb{E}_{(\sigma^{+}, \sigma^{-}, y) \in \mathcal{D}} \left[ \log \frac{\exp \sum r(s_{t}^{+}, a_{t}^{+})}{\exp \sum r(s_{t}^{+}, a_{t}^{+}) + \exp \sum r(s_{t}^{-}, a_{t}^{-})}\right]$$
+
+**传统强化学习的RLHF是对一条轨迹里的所有 $$(s,a)$$状态动作对的奖励进行了加和，而大模型Reward model这里则只有一个针对整个response的奖励值；传统强化学习对比的两个片段轨迹初始状态 $$s^+_0,s^-_0$$不一定是相同的，而大模型的偏好数据这里初始状态prompt $$x$$ 是相同的**
+
+更一般的，我们可以**把传统强化学习RLHF loss中的奖励加和换成一个聚合操作 `AGG`**，其中聚合操作可以取多种 $$\text{AGG}=[\sum,\sum\beta,-1,\text{Transformer()}]$$，这里列举的聚合操作分别是加和、加权和、取最后和Transformer聚合
+
+
+
+1. 加和:传统的 RL 设置。认为每一步的贡献是独立的、累积的。
+2. 加权和: 标准 RL 中的折扣因子 $\gamma$ 就是一种加权,也可以设置其它权重
+3. 取最后:只在乎最终结果，中间过程不管 (稀疏奖励 , 结果导向)
+4. Transformer 聚合 : reward序列输入给这个 Transformer，让它输出一个最终价值。
+
+
+
+**从这里可以延伸出对大模型Reward model训练loss的两个理解**，首先我们看一下**Reward Model训练的时候的操作**如下图，对于**每一个response只取最后一个token位置对应的value作为整个response的reward值即 $$r(x,y)$$** ,
+**
+
+![](note3RLHF.assets/diagram-4.png)
+
+1. 如果你把 LLM 看作**单步决策**，聚合就是取**最终结果（Last/-1）**。
+2. 如果你把 LLM 看作**多步决策**，且使用 Reward Model 打分，那么本质上你是在用 **Transformer 自动聚合** 整个序列的信息来得出一个分数。
+
+**为什么要用代表整个句子的奖励值？因为偏好标签是句子级别的** ,当然到了PRM过程奖励模型的时候也会有中间过程的偏好标签(比如数学题解题步骤的对错)
+
+#### **Reference Model**
+
+PPO训练过程中，它的参数是冻结的，用来产生per-token 的KL约束项，**防止策略导致偏离SFT模型太远**
+
+![](note3RLHF.assets/diagram-5.png)
+
+然后根据优化目标$$\max _\pi \mathbb{E}_{x \sim \mathcal{D}} \mathbb{E}_{y \sim \pi(y|x)} \left[ r(x, y) - \beta \log \frac{\pi(y|x)}{\pi_{\text{ref}}(y|x)} \right] \\$$，新的奖励可以写成 $$r(x,y)-\beta KL\_reward$$
+
+所以新的t**oken-level reward** 可以表示成$$\left\{\begin{array}{l}
+r_{t}=-\beta *\left(\log \frac{\pi\left(a_{t} \mid s_{t}\right)}{\pi_{r e f}\left(a_{t} \mid s_{t}\right)}\right), t \neq T \\
+r_{t}=r(x,y) -\beta *\left(\log \frac{\pi\left(a_{t} \mid s_{t}\right)}{\pi_{r e f}\left(a_{t} \mid s_{t}\right)}\right), t=T
+\end{array}\right.$$，其中$$T$$表示终止状态时间，也就是**句子末尾的token**，或者表示为$$r(s_t, a_t) = \textbf{I}(s_t =[\text{EOS}])r(x,y)-\beta \text{KL}(t)$$，具体如下图所示：
+
+![](note3RLHF.assets/diagram-6.png)
+
+
+
+## **Online & Offline RLHF**
+
+> **参考链接：https://www.zhihu.com/question/651021172/answer/3513159005**
+>
+> **Online和 Offline**也可以**回顾3.2.7章[ 3.2 RL 强化学习基础](https://kcnd4kn8i6ap.feishu.cn/wiki/Cz5YwDjdpiPbIFkiqWecXt0EnNb?fromScene=spaceOverview#share-QwGzdNFoxoeBOox3odmcUjhPnec)**
+>
+> - **Online 的核心思路就是：让模型自己做生成，我们根据模型生成结果的好坏来打分，用于指导模型进行更新**。Online 需要模型亲自输出答案，然后根据反馈学习；
+> - **Offline 的方法：**&#x6A21;型不需要亲自输出答案，根据提前收集好的Offline数据集中的给定的「好坏样本」来进行模拟学习。Off Policy 的训练速度能够更快（只用forward看大量的样本来学习，不用generate），但非常依赖给定的数据是否和「模型自身能力」足够相近。最理想的效果就是，找到大量和你自身水平差不多的玩家的对局资料给你学习，这些训练样本的利用率才是最高的。反之，对于 Online 所有的训练样本都是模型自己生成的
+
+
+
+
+
+## PPO Trick和问题
+
+### 模型层面:
+
+1. Token Level KL-Penalty: 引入一个“参考模型”,计算当前 PPO 模型输出的概率分布与 SFT 模型输出概率分布之间的 **KL 散度 , 强迫 PPO 模型不要离“初心”（SFT 模型学习到的人类语言规范）太远
+2. GAE $\lambda=1$: GAE用于在 PPO 中估计逐个 token 的奖励 ,将 GAE 方法转变为蒙特卡洛估计方法,  
+   $\lambda=1$ 可以减少由于 Value Model 估计不准带来的偏差，让模型更真实地依据最终结果来调整策略。
+3.  Adding SFT Loss :  PPO 训练时，模型一门心思只想提高“回答问题的满意度”（Reward）, 会导致模型忘记最基本的语言能力 ,  变成了一个“偏科生 ,在 PPO 的 Loss 函数中，强行加回原始的语言建模 Loss ,**可以保留SFT模型的既有能力**
+
+### PPO层面
+
+PPO-ptx(Pretraining Mix):PPO-ptx就是在原本的PPO优化目标（带KL行为约束的最大化累积奖励）基础上，**增加了一项当前policy在pretrain数据集上的优化目标**，或者说加了在pertain数据集上的预训练loss，即ptx loss，**用于避免策略遗忘预训练阶段学习到的知识**：
+
+$$\mathrm{objective}(\phi) = E_{(x,y)\sim D_{\pi_{\phi}^{\mathrm{RL}}}} \left[r_{\theta}(x,y) - \beta \log \left(\pi_{\phi}^{\mathrm{RL}}(y|x)/\pi^{\mathrm{SFT}}(y|x)\right)\right] +  \gamma E_{x\sim D_{\mathrm{pretrain}}} \left[\log(\pi_{\phi}^{\mathrm{RL}}(x))\right]$$
+
+$$\gamma E_{x\sim D_{\mathrm{pretrain}}} \left[\log(\pi_{\phi}^{\mathrm{RL}}(x))\right]$$这部分介绍ptx添加的loss
+
+目的是为了**减轻对齐税（Alignment Tax）**，即**RLHF 虽然有助于对齐人类偏好，但也可能导致模型在某些 NLP 基准上的性能下降**
+
+对较小的模型来说，会有对齐税，但**对较大模型来说，对齐只有好处**，尤其是参数量在 13B 到 52B 之间的模型，**即只要模型够大，PPO 本身就能在 NLP 下游任务上带来对齐的好处**，他们还确定了强化学习策略训练中 KL 散度系数的最优参数为 β = 0.001
+
+4. KL Reward：**&#x7B2C;二项的 KL reward前面有一个系数 beta，从实际训练的体验来说 beta的设置非常重要，可以有效避免策略走的太远（走太远容易导致策略过拟合和坍塌），这里beta的设定通常要结合target KL的设定，即我们可以通过实验确定KL变化多大模型的表现比较好，然后根据这个 target KL来决定 beta的大小，但是这种方式通常需要大量的实验比较。
+
+   ![](code/3.3%2520RLHF%2520%25E5%259F%25BA%25E4%25BA%258E%25E4%25BA%25BA%25E7%25B1%25BB%25E5%258F%258D%25E9%25A6%2588%25E7%259A%2584%25E5%25BC%25BA%25E5%258C%2596%25E5%25AD%25A6%25E4%25B9%25A0/images/image-4.png)
+
+5. **PTX Loss：**&#x6700;后一项是预训练的 Loss，同样这一项有一个系数 $$\gamma$$，InstructGPT 种将 $$\gamma$$设为 27.8，但在我的实验经历中，通常这一项应结合 policy loss 和 pretrain loss 的大小综合设定。在我的实验中，gamma < 1 模型才能比较好的收敛
+
+6. **Reward Normalization：**&#x5728; RLHF 的训练&#x4E2D;**&#x20;reward normalization 非常有助于训练的稳定性**，毕竟我们的 reward 不像在游戏环境中那么规则，而是通过一个模型学出来的中间层输出（这就意味着输出范围可能会很大）
+
+7. **Distributed Advantage Normalization：**&#x540C;&#x6837;**&#x20;Advantage Normalization 也是PPO训练中常用的稳定训练的技术**，我们在使用 DeepSpeed 等类似 DDP 的训练手段时应注意做全局样本的 Advantage Normalization，而不是某个DDP进程只针对自己的样本做归一化。这一点目前的 RLHF 开源框架都没有充分考虑进来
+
+8. **Model Initialization：**&#x5177;体来说，用监督微调（SFT）模型初始化 Actor 模型，用奖励模型初始化 Critic 模型，以确保高效的PPO训练。也是一般默认的操作
+
+9. **Adam Learning Rate：**&#x41;ctor model的Adam学习率大约是SFT模型学习率的十分之一。例如，在OpenRLHF中，SFT model的Adam学习率为5e−6，而actor model的学习率为5e−7。此外，评论者模型的Adam学习率大约是SFT model的两倍，一般设置学习率为9e−6
+
+10. **Value Function Loss Clipping：**$$Loss_v = \max[(V_{\theta_t} - V_{targ})^2, (\text{clip}(V_{\theta_t}, V_{\theta_{t-1}} - \epsilon,  V_{\theta_{t-1}} + \epsilon) - V_{targ})^2]$$，这个在前面3.3.3章节中的代码部分已经涉及到了
+
+11. **Advantage Normalization：**&#x5728;使用均方损失训练值网络的过程中，算法对一些大值敏感。标准化优势可以减轻这些大值的影响。实践中，我们还采用Z分数标准化方法，𝑟=(𝑟−𝜇)/𝛿，其中𝜇是一个批次样本的均值，𝛿是标准差
+
+## **奖励利用和泛化问题**
+
+持续在一个训练集合上做RL训练，发现train reward持续在涨，但是在测试集合上人**工测试效果会下跌**。总的来说，这是Reward hacking和Generalization问题导致的
+
+- **Reward hacking问题：**&#x5F53;train reward在增长的时候，但reward model被hack了，因此看似train reward增长，但其实人工评估的时候效果在下降。
+- **Generalization问题：**&#x5F53;train reward在增长的时候，假如test dataset的人工评估依然在上涨，那么reward hacking没有发生。此时此刻如果测试集合上效果却在下降，那么就是**模型overfit训练集合**，有泛化问题
+
+## **SFT 与 RLHF 的本质区别**
+
+### 分析
+
+- **SFT优化目标**：给定prompt和对应output，最大化LLM策略 $$π_θ$$输出output中每个token的条件概率，**output是数据集带的**
+- **RLHF优化目标**：PPO为例，可以简化为给定prompt目标为最大化优势 $$A_t$$，采以重要性采样比值 $$\frac{\pi_\theta(o_t|p,o_1,...,o_{t-1})}{\pi_{\theta_{old}}(o_t|p,o_1,...,o_{t-1})}$$，**output是 $$\pi_{\theta_{old}}$$采样得来**
+
+**梯度公式**
+
+$$\nabla_\theta J_{SFT}(\theta) = \mathbb{E}\left[\frac{1}{T}\sum_{t=1}^{T} \nabla_\theta \log \pi_\theta(o_t|p,o_1,...,o_{t-1})\right]$$
+
+$$\nabla_\theta J_{PPO}(\theta) = \mathbb{E}\left[\frac{1}{T}\sum_{t=1}^{T} A_t \nabla_\theta \log \pi_\theta(o_t|p,o_1,...,o_{t-1})\right]$$
+
+### 结论
+
+- SFT本质上在进行**模仿学习**，且所有token对应的**梯度系数为1**，对策略优化的贡献相同
+- RLHF-PPO本质上是在进行**探索和利用**，通过自身采样得到输出样本，然后**利用优势函数评判当前动作相对平均动作的价值,调整策略优化的方向和幅度**，优势的正负代表方向，绝对值代表幅度，梯度系数为$$A_t$$
+
+##### **RLAIF 基于AI反馈的强化学习**
+
+> 基于AI反馈（RLAIF）的强化学习，通过使用LLM来生成反馈信号来扩展RLHF范式。这种方法可以补充或替代人类反馈，在**人类标注稀缺、昂贵或不一致**的任务中提供更可扩展的低成本偏好数据
+
+![](note3RLHF.assets/image-5.png)
+
+> 大规模应用RLHF的主要挑战在于**RLHF依赖人类生成的偏好标签**，这需要大量资源。标注数据的过程既**时间密集型又昂贵**，并且人类评估人员可能会引入**不一致**的地方。这些约束大大限制了RLHF的可扩展性和效率。RLAIF 利用LLM作为反馈的来源，减少了对人类标注的依赖，提供了传统RLHF的可行替代方案。这种方法可实现连续的反馈生成，可显著提高可扩展性，同时保留人类引导模型优化的灵活性
+>
+> **RLHF和RLAIF之间的关键区别在于反馈的来源：RLHF取决于人类生成的偏好，而RLAIF使用AI生成的反馈来指导策略更新**。RLAIF可以实现与RLHF相当甚至优于RLHF的性能（**其实现在大部分偏好标签都会通过蒸馏GPT、Claude、Gemini等强模型来生成**）
+>
+> **AI feedback collect：**&#x4C;LM基于预先定义的标准（Prompt）生成**反馈标签**，标准可以包括**特定于任务的指标、response的长度等**
+
+## GRPO
+
+可以节省critic模型 , 大大节约显存, 节省的显存可以用于增大generate_batch_size , 降低平均分数的方差
+
+常用的便是用优势函数Advantage来指导，**优势函数原始定义为 $$A_t = Q(s_t,a_t)-V(s_t)$$即当前动作的价值比平均动作价值高出的部分 *
+
+#### GRPO的优势函数估计
+
+GRPO通过**对相同问题 $$q$$用 $$\pi_{\theta_{old}}$$采样的多个一组输出 $$\{o_1, o_2, \ldots, o_G\}$$，然后Reward model对这些回答都给出奖励值**，然后给出优势函数的估计 , 公式如下
+
+$$\hat{A}_i = \frac{r_i - \text{Mean}(\mathbf{r})}{\text{Std}(\mathbf{r}) + \epsilon}$$ ,**这就是对采样的这一组输出的奖励计算归一化奖励作为输出的优势函数，同时赋值给输出中每一个token作为该token处的优势函数。简单理解就是当前第$$i$$个输出的奖励 $$r_i(q,o_i)$$比所有输出的奖励平均值高出的优势（可以为负）**
+
+![](note3RLHF.assets/image-6.png)
+
+![](note3RLHF.assets/image-7.png)
+
+
+

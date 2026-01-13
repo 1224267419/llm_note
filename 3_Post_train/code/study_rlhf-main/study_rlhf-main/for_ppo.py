@@ -1,39 +1,63 @@
+# ---
+# jupyter:
+#   jupytext:
+#     formats: ipynb,py:percent
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.18.1
+#   kernelspec:
+#     display_name: Python 3 (ipykernel)
+#     language: python
+#     name: python3
+# ---
+
 # %% [markdown]
 # # 代码实现ppo
 
 # %% [markdown]
+# 先把本教程中的mask忽略，加入了一些mask写的有点乱
+
+# %% [markdown]
 # trl代码中的对于ppo的实现
 # https://github.com/huggingface/trl/blob/main/trl/trainer/ppo_trainer.py
+#
+# https://mp.weixin.qq.com/s/S72LO26IsZ8AED8sQKIWnQ
+#
+# 讲了PPO  loss max https://zhuanlan.zhihu.com/p/28223597805
+#
+# https://zhuanlan.zhihu.com/p/677607581
 
 # %% [markdown]
 # 下面为你解释这些参数的含义：
-# 
+#
 # ### 模型架构相关参数
 # 1. **`vocab_size = 10`**
 # 词汇表的大小代表了模型能够识别的不同词汇的数量。举例来说，若你正在处理的是一个简单的数字文本任务，其中仅有 0 - 9 这 10 个数字，那么 `vocab_size` 就会被设定为 10。
-# 
+#
 # 2. **`hidden_size = 128`**
 # 隐藏层的维度大小表明了模型中每个隐藏层神经元的数量。在神经网络里，隐藏层会对输入数据进行特征提取与转换。`hidden_size` 越大，模型所能学习到的特征就越复杂，不过这也会使计算量和内存需求增加。
-# 
+#
 # 3. **`intermediate_size = 256`**
 # 在 Transformer 架构里，`intermediate_size` 指的是前馈神经网络（FFN）中间层的维度。FFN 一般由两个线性层构成，中间层的维度通常会比输入输出层的维度大，这样有助于模型学习到更丰富的特征。
-# 
+#
 # 4. **`num_hidden_layers = 2`**
 # 隐藏层的数量意味着模型中堆叠的隐藏层的层数。层数越多，模型的表达能力就越强，能够学习到更复杂的模式，但同时也会增加过拟合的风险以及训练的难度。
-# 
+#
 # 5. **`num_attention_heads = 4`**
 # 注意力头的数量是指在多头注意力机制中并行的注意力头的个数。多头注意力机制能够让模型从不同的表示子空间中捕捉特征，提升模型的表达能力。
-# 
+#
 # 6. **`num_key_value_heads = 4`**
 # 键值对注意力头的数量在某些改进的注意力机制中会用到，它决定了用于计算键（key）和值（value）的注意力头的数量。在标准的多头注意力机制里，`num_key_value_heads` 通常和 `num_attention_heads` 相等。
-# 
+#
 # ### 数据处理和生成相关参数
 # 7. **`batch_size = 5`**
 # 批量大小代表了在一次训练或者推理过程中同时处理的样本数量。使用较大的批量大小能够提升训练效率，但会增加内存的需求；而较小的批量大小则可以减少内存使用，但会使训练速度变慢。
-# 
+#
 # 8. **`length_x = 5`**
 # 输入序列的长度指的是每个输入样本的长度。在处理文本时，它代表的是输入文本中词元（token）的数量。
-# 
+#
 # 9. **`max_new_tokens = 5`**
 # 最大新生成的词元数量表示在文本生成任务中，模型最多可以生成的词元数量。例如在文本续写任务里，这个参数会限制模型生成的文本长度。 
 
@@ -49,7 +73,7 @@ max_new_tokens = 5
 
 # %% [markdown]
 # ## 初始化actor模型
-# 
+#
 # 以GPT2为例，初始化模型
 
 # %%
@@ -79,15 +103,15 @@ model = GPT2LMHeadModel(config)
 
 # %% [markdown]
 # ## model generate
-# 
+#
 # 主要看下inputs_ids和attention_mask的含义
 
 # %% [markdown]
 # ### inputs_ids
-# 
+#
 # input_ids：它是一个张量（tensor），表示文本被分词后每个词（token）对应的 ID。比如在第一行 [20015, 232, 25465, ...] 中，每个数字都是原文本中一个词被 GPT - 2 分词器转换后的唯一标识。不同模型的词表不同，这些 ID 对应的具体词汇也不一样。这里第一行可能对应一句中文文本分词结果，第二行 [14150, 257, 922, ...] 前半部分对应英文文本，后半部分 50256 一般是填充值 ，表示补齐固定长度。
-# 
-# 
+#
+#
 # attention_mask：同样是张量，用于指示哪些位置是有效的词（值为 1），哪些位置是填充的（值为 0） 。比如第二行 [1, 1, 1, 1, 0, 0, 0, 0, 0, 0] 表示前 4 个词是有效输入，后面是填充的，模型在处理时会忽略填充位置。
 
 # %% [markdown]
@@ -112,7 +136,6 @@ print(inputs)
 
 # %%
 output_ids = model.generate(inputs['input_ids'], max_new_tokens=max_new_tokens)
-
 print(output_ids)
 
 
@@ -137,6 +160,10 @@ print(output_ids)
 output_ids = tokenizer.batch_decode(output_ids, skip_special_tokens=True)
 print(output_ids)
 
+
+# %% [markdown]
+# # 现在开始正式讲rlhf流程
+
 # %% [markdown]
 # ## 初始化reward model
 
@@ -149,37 +176,37 @@ print(output_ids)
 #     [1, 2, 3, 4],  # 第一个序列
 #     [5, 6, 7, 8]   # 第二个序列
 # ])
-# 
+#
 # attention_mask = torch.tensor([
 #     [1, 1, 1, 0],  # 第一个序列有效长度为3
 #     [1, 1, 1, 1]   # 第二个序列有效长度为4
 # ])
-# 
+#
 # sequence_length = attention_mask.sum(dim=1).long() - 1
-# 
+#
 # 结果: tensor([2, 3])
-# 
+#
 # 第一个序列：3-1=2（索引从0开始）
-# 
+#
 # 第二个序列：4-1=3
-# 
+#
 # batch_indices = torch.arange(batch_size)
-# 
+#
 # 结果: tensor([0, 1])
-# 
+#
 # 假设hidden_size = 2
-# 
+#
 # last_hidden_state = torch.tensor([
 #     [[1.0, 1.1], [2.0, 2.1], [3.0, 3.1], [4.0, 4.1]],  # 第一个序列
 #     [[5.0, 5.1], [6.0, 6.1], [7.0, 7.1], [8.0, 8.1]]   # 第二个序列
 # ])
-# 
+#
 # 使用batch_indices和sequence_length提取
-# 
+#
 # result = last_hidden_state[batch_indices, sequence_length]
-# 
+#
 # 结果: tensor([[3.0, 3.1],    # 第一个序列的第2个位置（索引从0开始）
-# 
+#
 # [8.0, 8.1]])   # 第二个序列的第3个位置
 
 # %%
@@ -197,18 +224,20 @@ class GPTRewardModel(torch.nn.Module):
         batch_size = input_ids.shape[0]
         # 确保sequence_length是long类型
         sequence_length = attention_mask.sum(dim=1).long() - 1
-        
         # 使用torch.arange并确保在正确的设备上
         batch_indices = torch.arange(batch_size, device=input_ids.device).long()
         last_hidden_state = last_hidden_state[batch_indices, sequence_length]
-        
+        print(f"last_hidden_state shape: {last_hidden_state.shape}, sequence_length: {sequence_length.shape}")
         # 计算奖励
         rewards = self.reward_head(last_hidden_state)
         return rewards
 
 # 重新初始化模型
 model.config.output_hidden_states = True
-rm_model = GPTRewardModel(model, torch.nn.Linear(hidden_size, 1))
+rm_model = GPTRewardModel(model, torch.nn.Linear(hidden_size, 1)) ## 这里的reward_head是一个线性层，将最后一个隐藏状态映射到奖励值
+
+# %%
+inputs['input_ids']
 
 # %%
 reward = rm_model(inputs['input_ids'], inputs['attention_mask'])
@@ -241,12 +270,12 @@ prompt_attention_mask
 
 # %% [markdown]
 # 创建几个模型
-# 
-# 
+#
+#
 # model_ref 和model的配置一样
-# 
+#
 # reward model和value model的配置大体一样
-# 
+#
 # value model的输出是所有token的隐藏状态所得到的value
 
 # %%
@@ -260,32 +289,33 @@ model_ref = GPT2LMHeadModel(config)
 print(model_ref)
 print(model)
 
+
 # %% [markdown]
 # ## 初始化value model
 
 # %% [markdown]
 # 假设我们有以下维度的数据：
-# 
+#
 # last_hidden_state 的形状是 [batch_size, sequence_length, hidden_size]
-# 
+#
 # 比如 [5, 10, 128]，表示批次大小为5，序列长度为10，隐藏层维度为128
-# 
+#
 # self.value_head 是一个线性层 Linear(hidden_size, 1)
-# 
+#
 # 输入维度是128，输出维度是1
-# 
+#
 # 处理过程：
-# 
+#
 # self.value_head(last_hidden_state) 的操作：
-# 
+#
 # 输入: [5, 10, 128]
-# 
+#
 # 输出: [5, 10, 1] # 线性层将最后一个维度从128转换为1
-# 
+#
 # [:, :, 0] 的操作：
-# 
+#
 # 取最后一个维度的第0个元素
-# 
+#
 # 结果形状变为: [5, 10]
 
 # %%
@@ -298,9 +328,7 @@ class GPTValueModel(torch.nn.Module):
     def forward(self, input_ids, attention_mask):
         outputs = self.gpt_model(input_ids=input_ids, attention_mask=attention_mask)
         last_hidden_state = outputs.hidden_states[-1]
-        
         values = self.value_head(last_hidden_state)[:, :, 0]
-
         return values
     
 model.config.output_hidden_states = True
@@ -310,6 +338,7 @@ vm_model = GPTValueModel(model,torch.nn.Linear(hidden_size, 1))
 print(rm_model)
 print(vm_model)
 
+
 # %% [markdown]
 # ## ppo前向过程
 
@@ -317,12 +346,12 @@ print(vm_model)
 # 创建几个model的函数
 
 # %%
-def get_response(model, prompt, max_new_tokens):
-    inputs = {'input_ids': prompt}  # ignore mask，好像不需要mask
+def get_response(model, prompt, max_new_tokens, attention_mask):
+    inputs = {'input_ids': prompt, 'attention_mask': attention_mask}  # ignore mask，好像不需要mask
     y = model.generate(**inputs,
-                       max_new_tokens=max_new_tokens,
-                       # forced_eos_token_id=True
-                       )
+                max_new_tokens=max_new_tokens,
+                # forced_eos_token_id=True
+                )
     return y
 
 def get_reward(model, response, attention_mask):
@@ -335,6 +364,7 @@ def get_value(model, prompt, attention_mask):
     y = model(inputs['input_ids'], inputs['attention_mask'])
     return y
 
+
 # %%
 prompt
 
@@ -346,6 +376,9 @@ prompt_attention_mask
 
 # %%
 attention_mask
+
+# %% [markdown]
+# 在这里就可以看到，ppo流程中的reward只是在最后一个token上得到的，但是我的value model要在每一个token上得到一个价值
 
 # %%
 print(get_response(model, prompt, max_new_tokens, prompt_attention_mask))
@@ -378,19 +411,19 @@ models = PPOModels(model, model_ref, rm_model, vm_model)
 
 # %% [markdown]
 # 1. ppo_epochs在每次策略更新时，PPO 算法对收集到的数据进行迭代训练的次数。
-# 
+#
 # 2. mini_batch_size每个训练步骤中，从收集到的数据里选取的小批量数据的样本数量。
-# 
+#
 # 3. epochs整个训练过程中，算法对所有收集到的数据进行完整遍历的次数。
-# 
+#
 # 4. kl_ctlKL 散度惩罚项的系数，用于控制新旧策略之间的差异程度。
-# 
+#
 # 5. vf_coef价值函数损失的系数，用于平衡策略损失和价值函数损失在总损失中的权重。
-# 
+#
 # 6. lam广义优势估计（GAE）中的 \(\lambda\) 参数，用于平衡优势估计的偏差和方差。
-# 
+#
 # 7. gamma折扣因子，用于计算未来奖励的折现值，决定未来奖励在当前价值估计中的重要程度。
-# 
+#
 # 8. cliprange_value价值函数裁剪范围的参数，用于限制价值函数更新的幅度
 
 # %%
@@ -445,31 +478,31 @@ ppo_old_batchs
 
 # %% [markdown]
 # logprobs = F.log_softmax(logits, dim=-1)第一步:对logits进行softmax并取log
-# 
+#
 # torch.gather是一个用于从张量中按索引收集值的操作 
-# 
+#
 # 假设我们有:
-# 
+#
 # logp.shape = [1, 5, 32]      # [batch_size, seq_len, vocab_size]
-# 
+#
 # labels.shape = [1, 5]        # [batch_size, seq_len]
-# 
+#
 # 1. labels.unsqueeze(2)
-# 
+#
 # 在最后增加一个维度
-# 
+#
 # labels_expanded = labels.unsqueeze(2)   # shape变为[1, 5, 1]
-# 
+#
 # 2. torch.gather(logp, 2, labels_expanded)
-# 
+#
 # dim=2表示在词表维度(第3维)上收集值
-# 
+#
 # gathered = torch.gather(logp, 2, labels_expanded)  # shape为[1, 5, 1]
-# 
+#
 # 3. squeeze(-1)
-# 
+#
 # 去掉最后一个维度
-# 
+#
 # logpy = gathered.squeeze(-1)  # 最终shape为[1, 5]
 
 # %%
@@ -478,22 +511,30 @@ import torch.nn.functional as F
 def get_logits(model, input_ids):
     # 得到logits
     outputs = model(input_ids=input_ids)
+    print(f"inputs_ids shape: {input_ids.shape}")
     logits = outputs.logits
+    print(f"logits shape: {logits.shape}")
     return logits
 
 def get_logprobs(model, response, attention_mask):
     # 得到logprobs
     logits = get_logits(model, response)
+    print(f"logits shape: {logits.shape}, response shape: {response.shape}, attention_mask shape: {attention_mask.shape}")
     # F.log_softmax() 是先进行softmax运算然后再取对数（log）
     all_token_logprobs = F.log_softmax(logits, dim=-1)
+    print(f"all_token_logprobs shape: {all_token_logprobs.shape}")
     # 使用torch.gather() 从logprobs中收集response的值
     gathered = torch.gather(all_token_logprobs, 2, response.unsqueeze(2))
+    print(f"gathered shape: {gathered.shape}, response shape: {response.shape}")
     # 去掉最后一个维度
     response_logprobs = gathered.squeeze(-1)
+    print(f"response_logprobs shape: {response_logprobs.shape}")
     return response_logprobs
 
 logprobs_ref = get_logprobs(models.ref, ppo_old_batchs['response'], ppo_old_batchs['mask'])
+print('\n')
 logprobs_old = get_logprobs(models.actor, ppo_old_batchs['response'], ppo_old_batchs['mask'])
+print('\n')
 logprobs = get_logprobs(models.actor, ppo_old_batchs['response'], ppo_old_batchs['mask'])
 
 print(logprobs_ref.shape)
@@ -506,6 +547,7 @@ response.shape
 
 # %%
 logprobs
+
 
 # %% [markdown]
 # 计算kl
@@ -522,7 +564,7 @@ print(kl)
 
 # %% [markdown]
 # 计算reward_kl
-# 
+#
 
 # %%
 def get_reward_with_kl(logprobs_ref, logprobs_old, kl_ctl, reward):
@@ -555,19 +597,62 @@ ppo_old_batchs['rewards_kl'] = kl_reward
 
 ppo_old_batchs
 
+
 # %% [markdown]
 # ## 计算loss
 
 # %% [markdown]
 # rewards：一个张量，代表在每个时间步获得的奖励。
-# 
+#
 # mask：一个掩码张量，用于标识哪些时间步是有效的（例如，用于处理终止状态）。
-# 
+#
 # values：一个张量，代表每个时间步的状态价值估计。
-# 
+#
 # gamma：折扣因子，用于计算未来奖励的折现值，取值范围通常在 [0, 1] 之间。
-# 
+#
 # lam：GAE 中的 \(\lambda\) 参数，用于平衡偏差和方差，取值范围同样在 [0, 1] 之间。
+
+# %% [markdown]
+#
+
+# %% [markdown]
+# # PPO 中的 GAE 公式
+#
+# 在PPO（Proximal Policy Optimization）算法中，优势函数和价值损失是连接价值估计与策略优化的核心组件。
+#
+# ## 优势函数（Advantage Function）
+#
+# 优势函数衡量在某一状态下采取特定动作的**相对价值**，定义为：
+#
+# $$A(s_t, a_t) = Q(s_t, a_t) - V(s_t)$$
+#
+# 状态 - 动作价值函数（Q 函数），表示在状态 \(s_t\) 采取动作 \(a_t\) 后，从后续轨迹中获得的总折扣回报的期望。
+#
+# 状态价值函数（V 函数），表示在状态 \(s_t\) 下，遵循当前策略时获得的总折扣回报的期望（即 “平均收益”）。
+#
+# 优势函数的本质是回答：
+#
+# 在状态 \(s_t\) 下选择动作 \(a_t\)，比‘按当前策略随机选一个动作’好多少？”
+#
+# 若 \(A(s_t, a_t) > 0\)：动作 \(a_t\) 优于平均水平，值得鼓励（策略应提高该动作的概率）
+#
+# 若 \(A(s_t, a_t) < 0\)：动作 \(a_t\) 劣于平均水平，应抑制（策略应降低该动作的概率）。
+#
+# 优势函数将 “绝对价值” 转化为 “相对价值”，减少了估计偏差（例如，即使 \(Q(s_t, a_t)\) 和 \(V(s_t)\) 都有误差，两者的差值可能更稳定）
+#
+# 在实际训练中，Q 和 V 无法直接获得，PPO 通常使用GAE（Generalized Advantage Estimation） 来估计优势函数
+#
+# GAE（Generalized Advantage Estimation）的时序差分残差公式：
+#
+# $$\delta_t = r_t + \gamma V(s_{t+1}) - V(s_t)$$
+#
+# 其中，$r_t$ 是时间步 $t$ 的奖励，$\gamma$ 是折扣因子，$V(s_t)$ 是状态 $s_t$ 的价值估计。
+#
+# GAE 优势估计的递归形式：
+#
+# $$\hat{A}_t = \delta_t + \gamma \lambda \hat{A}_{t+1}$$
+#
+# 其中 $\lambda$ 是 GAE 的衰减参数（$0 \leq \lambda \leq 1$）。
 
 # %%
 def get_GAE(rewards, attention_mask, values, gemma, lam):
@@ -590,12 +675,9 @@ def get_GAE(rewards, attention_mask, values, gemma, lam):
     return advantages
 
 
-# %%
-ppo_old_batchs
 
 # %%
-gae = get_GAE(ppo_old_batchs['rewards'], ppo_old_batchs['mask'], ppo_old_batchs['values_old'], ppo_config.gamma, ppo_config.lam)
-gae
+ppo_old_batchs
 
 # %%
 gae = get_GAE(ppo_old_batchs['rewards_kl'], ppo_old_batchs['mask'], ppo_old_batchs['values_old'], ppo_config.gamma, ppo_config.lam)
@@ -604,18 +686,18 @@ gae
 
 # %% [markdown]
 # 计算value loss
-# 
+#
 
 # %% [markdown]
 # advantages：优势函数的估计值，用于计算回报。
-# 
-# 
+#
+#
 # values：当前价值函数的估计值。
-# 
+#
 # values_old：旧的价值函数估计值。
-# 
+#
 # mask：掩码张量，用于指定哪些元素参与损失计算。
-# 
+#
 # cliprange_value：裁剪范围，用于限制价值函数的更新幅度。
 
 # %% [markdown]
@@ -630,13 +712,15 @@ def masked_mean(values: torch.Tensor, mask: torch.Tensor, axis = None) -> torch.
         return (values * mask).sum() / mask.sum()
 
 def get_value_loss(advantages, values, values_old, attention_mask, cliprange_value):
+    # 目标回报 = 旧价值估计 + 优势估计
+    # 这是因为优势函数的定义为：A = Q - V，因此 Q = V + A，这里用returns表示目标 Q 值
     returns = values_old + advantages
     advantages = advantages.detach()
-
+    # 对新的价值估计values进行裁剪，限制其与旧价值估计values_old的差异不超过cliprange_value
     vpredclipped = torch.clamp(values, values_old - cliprange_value, values_old + cliprange_value)
 
-    vf_losses1 = torch.square(vpredclipped - returns)
-    vf_losses2 = torch.square(values - returns)
+    vf_losses1 = torch.square(vpredclipped - returns) # 裁剪后的价值估计与目标回报的平方误差
+    vf_losses2 = torch.square(values - returns) # 未裁剪的价值估计与目标回报的平方误差
     vf_loss_max = torch.max(vf_losses1, vf_losses2)
     vf_loss = 0.5 * masked_mean(vf_loss_max, attention_mask)
     return vf_loss
@@ -650,9 +734,40 @@ ppo_old_batchs['values'] = ppo_old_batchs['values_old'] + 0.5
 value_loss = get_value_loss(gae, ppo_old_batchs['values'], ppo_old_batchs['values_old'], ppo_old_batchs['mask'], ppo_config.cliprange_value)
 value_loss
 
+
 # %% [markdown]
 # 计算policy loss
 # https://github.com/huggingface/trl/blob/26d86757a7c7e24e397ea44f57ecce6031dfac01/trl/trainer/ppo_trainer.py#L569-L574
+
+# %% [markdown]
+# markdown
+# # PPO（Proximal Policy Optimization）核心公式与实现
+#
+# PPO算法的核心是通过策略损失和价值损失的联合优化来更新智能体策略，以下是完整的公式说明与代码实现。
+#
+# ## 1. 策略损失（Policy Loss）
+#
+# ### 核心公式
+#
+# 策略损失的计算基于重要性采样和裁剪机制：
+#
+# 1. **重要性采样比率**  
+#    $$\text{ratio}_t = \frac{\pi_\theta(a_t | s_t)}{\pi_{\theta_{\text{old}}}(a_t | s_t)} = \exp\left(\log \pi_\theta(a_t | s_t) - \log \pi_{\theta_{\text{old}}}(a_t | s_t)\right)$$
+#
+# 2. **未裁剪损失**  
+#    $$L_1(\theta) = -A_t \cdot \text{ratio}_t$$
+#
+# 3. **裁剪后损失**  
+#    $$L_2(\theta) = -A_t \cdot \text{clip}(\text{ratio}_t, 1-\epsilon, 1+\epsilon)$$
+#
+# 4. **最终策略损失**  
+#    $$L_{\text{policy}}(\theta) = \mathbb{E}\left[ \max(L_1(\theta), L_2(\theta)) \right]$$
+#
+# 其中：
+# - $A_t$ 是优势估计（GAE计算结果）
+# - $\epsilon$ 是裁剪范围超参数（通常为0.2）
+# - $\pi_\theta$ 是当前策略，$\pi_{\theta_{\text{old}}}$ 是更新前的旧策略
+#
 
 # %%
 def get_policy_loss(advantages, logprobs, logprobs_old, mask, cliprange):
@@ -679,27 +794,56 @@ pg_loss
 
 # %% [markdown]
 # entropy（熵）没有直接参与到模型的损失（loss）
-# 
+#
 # 在计算完损失并进行反向传播和参数更新后，代码计算了 entropy
-# 
+#
 # 这里计算的 entropy 被记录到 entropy_stats 张量中，用于后续的统计和记录，但没有用于损失计算。
 
 # %%
 logits = get_logits(models.actor, ppo_old_batchs['response'])
 ppo_old_batchs['logits'] = logits
 
+
+# %% [markdown]
+# # PPO中的熵损失（Entropy Loss）计算
+#
+# 熵损失用于衡量策略的随机性，在PPO中通常作为总损失的一部分，鼓励智能体保持探索行为。
+#
+# ## 熵计算函数
+#
+# ```python
+# def get_entropy_loss(logits, mask):
+#     # 将logits转换为概率分布（softmax归一化）
+#     prob_dist = torch.nn.functional.softmax(logits, dim=-1)
+#     
+#     # 计算熵: H(p) = -Σ(p_i * log(p_i))
+#     # 等价于: log(Σ(exp(logits_i))) - Σ(p_i * logits_i)
+#     entropy = torch.logsumexp(logits, dim=-1) - torch.sum(prob_dist * logits, dim=-1)
+#     
+#     return entropy
+#
+# # 计算旧批次数据的熵
+# entropy = get_entropy_loss(ppo_old_batchs['logits'], ppo_old_batchs['mask'])
+# entropy  # 返回每个样本的熵值
+
 # %%
 def get_entropy_loss(logits, mask):
     prob_dist = torch.nn.functional.softmax(logits, dim=-1)
+    print(f"prob_dist shape: {prob_dist.shape}, logits shape: {logits.shape}")
+    # 计算熵
+    # 使用torch.logsumexp计算logits的对数和，然后减去每个概率分布乘以logits的和
+    # 这里的熵计算公式是 H(X) = log(sum(exp(logits))) - sum(prob_dist * logits)
+    
     entropy = torch.logsumexp(logits, dim=-1) - torch.sum(prob_dist * logits, dim=-1)
     return entropy
-
+print(f"logits shape: {logits.shape}, mask shape: {ppo_old_batchs['mask'].shape}")
 entropy = get_entropy_loss(ppo_old_batchs['logits'], ppo_old_batchs['mask'])
 entropy
                                 
 
 # %%
 loss = pg_loss + ppo_config.vf_coef * value_loss
+
 
 # %%
 def get_loss(batchs, ppo_config):
@@ -723,6 +867,7 @@ def get_loss(batchs, ppo_config):
     loss = pg_loss + ppo_config.vf_coef * value_loss
     return loss
 
+
 # %%
 loss = get_loss(ppo_old_batchs, ppo_config)
 loss
@@ -732,7 +877,7 @@ ppo_old_batchs
 
 # %% [markdown]
 # ## PPO训练
-# 
+#
 # https://github.com/huggingface/trl/blob/26d86757a7c7e24e397ea44f57ecce6031dfac01/trl/trainer/ppo_trainer.py#L529-L538
 
 # %% [markdown]
@@ -766,11 +911,13 @@ def get_minibatch(ppo_batchs, batch_size, mini_batch_size):
     
     return ppo_batchs_iter
 
+
 # %%
 optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
 # %%
 ppo_old_batchs
+
 
 # %%
 def ppo_train_step(models, ppo_batchs, ppo_config, get_loss, optimizer):
@@ -810,7 +957,5 @@ def ppo_train_step(models, ppo_batchs, ppo_config, get_loss, optimizer):
     ppo_batchs['loss'] = losses
     
     print(losses)
-
-
 
 
