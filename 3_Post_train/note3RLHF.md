@@ -844,6 +844,8 @@ LLM通过GRPO 这种 On-Policy 方法进行RL训练时，普遍存在Policy Coll
 
 虽然DPO不是RL方法,它优化了RL部分(把actor部分优化了)
 
+#### DPO公式
+
 RLHF 的标准目标函数：
 
 $$\max _\pi \mathbb{E}_{x \sim \mathcal{D}, y \sim \pi} [r(x, y)] - \beta D_{\text{KL}} [\pi(y|x) \| \pi_{\text{ref}}(y|x)]$$
@@ -858,8 +860,63 @@ $$\min _\pi \mathbb{E}_{x \sim \mathcal{D}} \mathbb{E}_{y \sim \pi(y|x)} \left[ 
 
 最优策略 $\pi^*$ 其实就是“原始模型 $\pi_{\text{ref}}$”加上“奖励信号 $r$”的加权修正
 
+跟据$\pi^*$的定义式 , 推理得$$r^*(x, y) = \beta \log \frac{\pi^*(y|x)}{\pi_{\text{ref}}(y|x)} + \beta \log Z(x)$$ 把奖励函数 $r(x,y)$，转化为了“**当前策略”和“参考策略”的比**。
+
+Bradley-Terry 模型（用于判断 $y_1$ 比 $y_2$ 好的概率）
+$$p(y_1 \succ y_2 | x) = \sigma(r(x, y_1) - r(x, y_2))$$
+将第三步推导出的 $r^*(x, y)$ 代入：有
+
+$$r(x, y_1) - r(x, y_2) = \left( \beta \log \frac{\pi^*(y_1|x)}{\pi_{\text{ref}}(y_1|x)} + \beta \log Z(x) \right) - \left( \beta \log \frac{\pi^*(y_2|x)}{\pi_{\text{ref}}(y_2|x)} + \beta \log Z(x) \right)$$
+
+由于 $Z(x)$ 只和 Prompt $x$ 有关，和具体的回答 $y$ 无关，所以在相减的过程中，**$\beta \log Z(x)$ 这一项直接抵消（Cancel out）了**
+
+$$r(x, y_1) - r(x, y_2) = \beta \log \frac{\pi^*(y_1|x)}{\pi_{\text{ref}}(y_1|x)} - \beta \log \frac{\pi^*(y_2|x)}{\pi_{\text{ref}}(y_2|x)}$$ 从而有
+$$\mathcal{L}_{\text{DPO}}(\pi_{\theta}, \pi_{\text{ref}}) = - \mathbb{E}_{(x, y_w, y_l) \sim \mathcal{D}} \left[ \log \sigma \left( \beta \log \frac{\pi_{\theta}(y_w | x)}{\pi_{\text{ref}}(y_w | x)} - \beta \log \frac{\pi_{\theta}(y_l | x)}{\pi_{\text{ref}}(y_l | x)} \right) \right]$$
+
+- **Policy to optimize ($\pi_\theta$)**: 当前正在训练的模型。
+- **Reference policy ($\pi_{\text{ref}}$)**: 参考模型（通常是 SFT 之后的原始模型，训练过程中参数冻结不变）。它的作用是防止训练后的模型偏离原始分布太远（起到 KL 散度约束的作用）。
+- **Aggregation over preference data**: 表示我们在人类偏好数据集 $\mathcal{D}$ 上计算期望，数据包含提示词 $x$、被选中的回答 $y_w$ (winner/chosen) 和被拒绝的回答 $y_l$ (loser/rejected)。
+- **Shift in preferred/dispreferred completion**:
+  - 公式的核心在于比较 **“选中回答”的隐式奖励** 和 **“拒绝回答”的隐式奖励**。
+  - $\log \frac{\pi_\theta(y | x)}{\pi_{\text{ref}}(y | x)}$ 这一项其实代表了模型相对于参考模型对某个回答的“信心提升程度”。
+- **Logistic function ($\sigma$)**: Sigmoid 函数，将数值映射到 (0, 1) 之间，用于计算概率。
+
+**去除了复杂的 PPO：** 由于没有了显式的 Reward 模型，我们不需要 Critic，不需要 GAE 估计，不需要处理复杂的强化学习采样循环。训练过程变成了类似“加权交叉熵”的监督学习，极其稳定。
+
+**隐式奖励的直观理解：** DPO Loss 实际上在鼓励模型：对于由 $x$ 生成的 $y$，如果它是优选答案 ($y_w$)，就**提高**它的概率（相对于 $\pi_{\text{ref}}$）；如果是劣选答案 ($y_l$)，就**降低**它的概率。$\beta$ 参数控制了这种奖励/惩罚的力度。
+
+下面两张图是DPO的流程图
+
+![](note3RLHF.assets/image-9.png)
+
+![](note3RLHF.assets/image-7-1768358208370.png)
+
+**微调流程图**
+
+
+
+DPO Loss:DPO 本质上像是一种对比学习,希望拉大“好回答”和“坏回答”之间的概率差值,实践中可能会出现 `Chosen` 和 `Reject` 的概率**都下降**的情况。这没关系，只要 `Reject` 下降得比 `Chosen` 更厉害，差值变大了，Loss 依然会降低，模型依然在学习区分好坏
+
+为了防止模型“为了降低 Loss 而把所有生成概率都降得很低”，有些后续工作会加入 NLL Loss（负对数似然损失）来辅助，强制模型保持一定的生成能力
+
+#### DPO 的工作流
+
+**输入成对的偏好数据 -> 同时经过当前模型和参考模型 -> 计算对数概率比值 -> 通过 Loss 函数拉大好坏回答的差距**
+
+[dpoLoss代码](code\dpo_loss.py)
+
+
+
+
+
+
+
+
+
 
 
 TODO
 
 ReMax往后先放一放
+
+DPO代码往后的部分先略过
